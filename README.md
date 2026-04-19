@@ -4,6 +4,9 @@ Own your server again.
 
 **Download and build a better one. We dare you.**
 
+![PRISM Terminal Banner](assets/prism-banner.png)
+*The PRISM identity banner — displayed on every login*
+
 ## What PRISM Is
 PRISM is a private, resilient, independent home server platform for people who want local services without surrendering control. It is built on Debian, designed to stay root-accessible, and meant to explain itself instead of hiding behind appliance theater.
 
