@@ -275,10 +275,18 @@ on 3B models in our testing. A better GPU does proportionally better.
 Clustering works well for running PRISM services across multiple machines.
 It does not work well for AI inference on gigabit ethernet.
 
-We tested this extensively. A single OptiPlex 7090 with 64GB RAM running
-llama.cpp outperformed a 7-node cluster on distributed inference. A
-12-node expanded cluster with 464GB combined RAM still could not run
-405B usefully on gigabit.
+We tested this in order: exo failed on storage, llama.cpp RPC never
+finished loading 70B across 5 nodes, and distributed-llama finally
+proved 70B across 4 nodes — each requiring a dedicated second SSD for
+model shard storage. Speed: 0.37 tokens per second, 56 minutes from
+cold start to first response.
+
+A single OptiPlex 7090 with 64GB RAM running llama.cpp was dramatically
+faster than all of that.
+
+For 405B we expanded to 12 nodes and 464GB combined RAM. It still failed.
+Gigabit ethernet was the bottleneck, not the RAM. 10GbE would be required
+and costs more than buying better hardware.
 
 The network is always the bottleneck, not the RAM.
 
