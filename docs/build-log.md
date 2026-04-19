@@ -7,7 +7,7 @@
 - moving into PRISM build work
 ## 2026-04-13T12:37:00-07:00 Phase 2 start
 - created PRISM workspace in vault
-- confirmed output path /vault/pve-media/images is available
+- confirmed build output path is available
 - confirmed local image build toolchain is present (debootstrap/mmdebstrap/grub/xorriso/sgdisk/qemu-img)
 
 ## 2026-04-13T12:50:00-07:00 First-boot scaffolding
@@ -35,12 +35,12 @@
 - PRISM Offline v0.1 is complete, compressed, and checksummed.
 - PRISM Net v0.1 has been fully designed and specced at the planning level.
 - Files created today for Net build:
-  - `/vault/pve-media/projects/prism/configs/packages.net`
-  - `/vault/pve-media/projects/prism/net/motd/10-prism`
-  - `/vault/pve-media/projects/prism/net/first-boot/prism-firstboot.sh`
-- `llama.mp3` was saved to `/vault/pve-media/projects/prism/assets/llama.mp3`
-- Colored MOTD banner was saved to `/vault/pve-media/projects/prism/net/motd/10-prism`
-- Net first-boot script first draft is in progress at `/vault/pve-media/projects/prism/net/first-boot/prism-firstboot.sh`
+  - `configs/packages.net`
+  - `net/motd/10-prism`
+  - `net/first-boot/prism-firstboot.sh`
+- `llama.mp3` was saved to `assets/llama.mp3`
+- Colored MOTD banner was saved to `net/motd/10-prism`
+- Net first-boot script first draft is in progress at `net/first-boot/prism-firstboot.sh`
 - Next session should focus on:
   - Finalizing firstboot script native installs
   - Building the Net image
@@ -95,7 +95,7 @@
   - verify first-boot end-to-end behavior
   - boot test on the 7020 prototype
 - start next session with:
-  - `/vault/pve-media/projects/CONTEXT.md`
+  - main project context file
 - signed off: 2026-04-14
 
 ## 2026-04-15 BOOT TEST PASSED
@@ -143,8 +143,8 @@ Notes:
 
 ## 2026-04-18 PRISM Net image build complete
 - Reference builder: FM09
-- Raw image: `/vault/pve-media/render/prism-build-fm09/prism-net-v1-fm09-20260418.raw`
-- Compressed image: `/vault/pve-media/render/prism-build-fm09/prism-net-v1-fm09-20260418.raw.gz`
+- Raw image: builder output raw image artifact
+- Compressed image: builder output compressed image artifact
 - Raw size: 32G
 - Compressed size: 1015M
 - SHA256 raw: `0723be090ae379fbfe09e5d6857a7e17dea59ce0582af10545f0c192fafc54d1`
@@ -167,4 +167,4 @@ Next session:
 - gh auth login on mothership
 - Create and push GitHub repos
 - Boot test PRISM on real 7020 hardware
-- Start with: Read /vault/pve-media/projects/CONTEXT.md
+- Start with: read the main project context file

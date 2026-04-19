@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOTFS="${1:?usage: install-prism-net-assets.sh ROOTFS}"
-PROJECT_ROOT="/vault/pve-media/projects/prism"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 NET_ROOT="$PROJECT_ROOT/net"
 
 install -d \

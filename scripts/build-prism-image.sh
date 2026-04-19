@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 SUITE="${SUITE:-bookworm}"
 ARCH="${ARCH:-amd64}"
 MIRROR="${MIRROR:-http://deb.debian.org/debian}"
-WORKDIR="${WORKDIR:-/vault/pve-media/projects/prism/build}"
+WORKDIR="${WORKDIR:-/tmp/prism-build}"
 ROOTFS_DIR="${ROOTFS_DIR:-$WORKDIR/rootfs}"
-IMAGE_RAW="${IMAGE_RAW:-$WORKDIR/prism-v1-20260413.raw}"
-IMAGE_GZ="${IMAGE_GZ:-/vault/pve-media/images/prism-v1-20260413.img.gz}"
+IMAGE_RAW="${IMAGE_RAW:-$WORKDIR/prism-v1.raw}"
+IMAGE_GZ="${IMAGE_GZ:-$WORKDIR/prism-v1.img.gz}"
 IMAGE_SIZE_GB="${IMAGE_SIZE_GB:-64}"
 HOSTNAME="${HOSTNAME:-prism}"
 TIMEZONE="${TIMEZONE:-America/Los_Angeles}"
-PACKAGE_FILE="${PACKAGE_FILE:-/vault/pve-media/projects/prism/configs/packages.base}"
-ASSET_INSTALLER="${ASSET_INSTALLER:-/vault/pve-media/projects/prism/scripts/install-prism-assets.sh}"
+PACKAGE_FILE="${PACKAGE_FILE:-$REPO_ROOT/configs/packages.base}"
+ASSET_INSTALLER="${ASSET_INSTALLER:-$REPO_ROOT/scripts/install-prism-assets.sh}"
 
 LOOPDEV=""
 cleanup() {

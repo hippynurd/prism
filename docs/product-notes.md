@@ -1113,8 +1113,8 @@ Iris hardware assessment is unique:
 Date: 2026-04-14
 
 ### Image
-- Raw: /vault/pve-media/projects/prism/build/prism-v1-20260413.raw (64GB)
-- Compressed: /vault/pve-media/projects/prism/build/prism-v1-20260413.raw.gz (8.4GB)
+- Raw: build workspace output raw image (64GB in the recorded build)
+- Compressed: build workspace compressed image (8.4GB in the recorded build)
 - SHA256 raw: 28f545c548c385b1408d0f9f5ca519b61b993cd1abac7e482d45b51a31cafe87
 - SHA256 gz:  6a754ca77c2199626d371ee0e44e1e335a2be13f56c816404bb85dfc0fe7c3a3
 

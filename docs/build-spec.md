@@ -9,7 +9,7 @@ Status: Draft
 - Base OS: Debian 12
 - Hardware target: Dell OptiPlex 7020
 - Deployment target: PXE-deliverable image for iVentoy
-- Output artifact: `/vault/pve-media/images/prism-v1-20260413.img.gz`
+- Output artifact: generated image artifact from the build workspace, for example `"$WORKDIR/prism-v1.img.gz"`
 
 ### Core Platform Rules
 

@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run repo validation
+        run: bash scripts/validate-repo.sh
+
+      - name: Shellcheck
+        run: |
+          mapfile -t shell_scripts < <(find . -type f \( -name '*.sh' -o -path '*/10-prism' \) | sort)
+          shellcheck "${shell_scripts[@]}"
+
+      - name: Python syntax
+        run: |
+          while IFS= read -r file; do
+            python3 -m py_compile "$file"
+          done < <(find . -type f -name '*.py' | sort)

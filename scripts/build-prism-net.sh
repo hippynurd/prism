@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 SUITE="${SUITE:-bookworm}"
 ARCH="${ARCH:-amd64}"
 MIRROR="${MIRROR:-http://deb.debian.org/debian}"
-WORKDIR="${WORKDIR:-/vault/pve-media/projects/prism/build}"
+WORKDIR="${WORKDIR:-/tmp/prism-build}"
 ROOTFS_DIR="${ROOTFS_DIR:-$WORKDIR/rootfs-net}"
-IMAGE_RAW="${IMAGE_RAW:-$WORKDIR/prism-net-20260418.raw}"
+IMAGE_RAW="${IMAGE_RAW:-$WORKDIR/prism-net.raw}"
 IMAGE_SIZE_GB="${IMAGE_SIZE_GB:-32}"
 HOSTNAME="${HOSTNAME:-prism-net}"
 TIMEZONE="${TIMEZONE:-America/Los_Angeles}"
-PACKAGE_FILES="${PACKAGE_FILES:-/vault/pve-media/projects/prism/configs/packages.base /vault/pve-media/projects/prism/configs/packages.net}"
-ASSET_INSTALLER="${ASSET_INSTALLER:-/vault/pve-media/projects/prism/scripts/install-prism-net-assets.sh}"
+PACKAGE_FILES="${PACKAGE_FILES:-$REPO_ROOT/configs/packages.base $REPO_ROOT/configs/packages.net}"
+ASSET_INSTALLER="${ASSET_INSTALLER:-$REPO_ROOT/scripts/install-prism-net-assets.sh}"
 
 LOOPDEV=""
 cleanup() {

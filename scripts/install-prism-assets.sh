@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOTFS="${1:?usage: install-prism-assets.sh ROOTFS}"
-PROJECT_ROOT="/vault/pve-media/projects/prism"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 install -d "$ROOTFS/usr/local/sbin" "$ROOTFS/etc/systemd/system" "$ROOTFS/etc/prism"
 install -m 0755 "$PROJECT_ROOT/first-boot/prism-firstboot.sh" "$ROOTFS/usr/local/sbin/prism-firstboot"
