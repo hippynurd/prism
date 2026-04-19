@@ -6,3 +6,7 @@ rootfs/
 rootfs-net/
 rootfs-net-fm09/
 build/
+__pycache__/
+*.pyc
+*.pyo
+.Python
