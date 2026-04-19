@@ -1,0 +1,17 @@
+[Unit]
+Description=PRISM first boot onboarding
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/var/lib/prism/firstboot.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/prism-firstboot
+StandardInput=tty-force
+StandardOutput=journal+console
+StandardError=journal+console
+TTYPath=/dev/tty1
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

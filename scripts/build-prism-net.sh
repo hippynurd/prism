@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SUITE="${SUITE:-bookworm}"
+ARCH="${ARCH:-amd64}"
+MIRROR="${MIRROR:-http://deb.debian.org/debian}"
+WORKDIR="${WORKDIR:-/vault/pve-media/projects/prism/build}"
+ROOTFS_DIR="${ROOTFS_DIR:-$WORKDIR/rootfs-net}"
+IMAGE_RAW="${IMAGE_RAW:-$WORKDIR/prism-net-20260418.raw}"
+IMAGE_SIZE_GB="${IMAGE_SIZE_GB:-32}"
+HOSTNAME="${HOSTNAME:-prism-net}"
+TIMEZONE="${TIMEZONE:-America/Los_Angeles}"
+PACKAGE_FILES="${PACKAGE_FILES:-/vault/pve-media/projects/prism/configs/packages.base /vault/pve-media/projects/prism/configs/packages.net}"
+ASSET_INSTALLER="${ASSET_INSTALLER:-/vault/pve-media/projects/prism/scripts/install-prism-net-assets.sh}"
+
+LOOPDEV=""
+cleanup() {
+  set +e
+  if mountpoint -q "$ROOTFS_DIR/boot/efi"; then umount "$ROOTFS_DIR/boot/efi"; fi
+  if mountpoint -q "$ROOTFS_DIR/dev/pts"; then umount "$ROOTFS_DIR/dev/pts"; fi
+  if mountpoint -q "$ROOTFS_DIR/dev"; then umount "$ROOTFS_DIR/dev"; fi
+  if mountpoint -q "$ROOTFS_DIR/proc"; then umount "$ROOTFS_DIR/proc"; fi
+  if mountpoint -q "$ROOTFS_DIR/sys"; then umount "$ROOTFS_DIR/sys"; fi
+  if mountpoint -q "$ROOTFS_DIR"; then umount "$ROOTFS_DIR"; fi
+  if [[ -n "$LOOPDEV" ]]; then losetup -d "$LOOPDEV"; fi
+}
+trap cleanup EXIT
+
+require() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "missing required command: $1" >&2
+    exit 1
+  }
+}
+
+for cmd in debootstrap sgdisk losetup mkfs.vfat mkfs.ext4 blkid mount chroot grub-install update-initramfs; do
+  require "$cmd"
+done
+require "$ASSET_INSTALLER"
+
+mkdir -p "$WORKDIR"
+rm -rf "$ROOTFS_DIR"
+mkdir -p "$ROOTFS_DIR"
+rm -f "$IMAGE_RAW"
+
+echo "[phase] Partitioning image"
+truncate -s "${IMAGE_SIZE_GB}G" "$IMAGE_RAW"
+sgdisk --zap-all "$IMAGE_RAW"
+sgdisk -og "$IMAGE_RAW"
+sgdisk -n 1:1MiB:+512MiB -t 1:ef00 -c 1:"EFI System" "$IMAGE_RAW"
+sgdisk -n 2:0:0 -t 2:8304 -c 2:"PRISM Net Root" "$IMAGE_RAW"
+
+LOOPDEV="$(losetup --find --show --partscan "$IMAGE_RAW")"
+udevadm settle
+
+mkfs.vfat -F 32 -n PRISM_EFI "${LOOPDEV}p1"
+mkfs.ext4 -F -L PRISM_NET_ROOT "${LOOPDEV}p2"
+
+mount "${LOOPDEV}p2" "$ROOTFS_DIR"
+mkdir -p "$ROOTFS_DIR/boot/efi"
+mount "${LOOPDEV}p1" "$ROOTFS_DIR/boot/efi"
+echo "[phase] Partitioning done"
+
+package_list="$(cat $PACKAGE_FILES | sed '/^\s*$/d' | sort -u | paste -sd, -)"
+
+echo "[phase] Running debootstrap"
+debootstrap \
+  --arch="$ARCH" \
+  --variant=minbase \
+  --include="$package_list" \
+  "$SUITE" "$ROOTFS_DIR" "$MIRROR"
+echo "[phase] debootstrap done"
+
+echo "[phase] Installing PRISM Net assets"
+"$ASSET_INSTALLER" "$ROOTFS_DIR"
+echo "[phase] Assets installed"
+
+echo "$HOSTNAME" > "$ROOTFS_DIR/etc/hostname"
+cat > "$ROOTFS_DIR/etc/hosts" <<EOF
+127.0.0.1 localhost
+127.0.1.1 $HOSTNAME
+
+::1 localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+EOF
+
+ROOT_UUID="$(blkid -s UUID -o value "${LOOPDEV}p2")"
+EFI_UUID="$(blkid -s UUID -o value "${LOOPDEV}p1")"
+cat > "$ROOTFS_DIR/etc/fstab" <<EOF
+UUID=$ROOT_UUID / ext4 defaults 0 1
+UUID=$EFI_UUID /boot/efi vfat umask=0077 0 1
+EOF
+
+cat > "$ROOTFS_DIR/etc/default/locale" <<EOF
+LANG=en_US.UTF-8
+LC_ALL=en_US.UTF-8
+EOF
+
+cat > "$ROOTFS_DIR/etc/timezone" <<EOF
+$TIMEZONE
+EOF
+
+cat > "$ROOTFS_DIR/etc/apt/sources.list" <<EOF
+deb $MIRROR $SUITE main contrib non-free non-free-firmware
+deb http://security.debian.org/debian-security ${SUITE}-security main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian ${SUITE}-updates main contrib non-free non-free-firmware
+EOF
+
+mount --bind /dev "$ROOTFS_DIR/dev"
+mount --bind /dev/pts "$ROOTFS_DIR/dev/pts"
+mount --bind /proc "$ROOTFS_DIR/proc"
+mount --bind /sys "$ROOTFS_DIR/sys"
+
+echo "[phase] Configuring chroot"
+chroot "$ROOTFS_DIR" /bin/bash -eux <<'EOF'
+echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen
+locale-gen
+ln -sf /usr/share/zoneinfo/America/Los_Angeles /etc/localtime
+dpkg-reconfigure -f noninteractive tzdata
+systemctl enable NetworkManager systemd-resolved ssh nginx avahi-daemon fail2ban prism-firstboot
+if [[ -f /etc/nginx/sites-enabled/default ]]; then
+  rm -f /etc/nginx/sites-enabled/default
+fi
+ln -sf /etc/nginx/sites-available/prism-setup /etc/nginx/sites-enabled/prism-setup
+nginx -t
+EOF
+echo "[phase] Chroot config done"
+
+echo "[phase] Installing bootloader"
+chroot "$ROOTFS_DIR" /bin/bash -eux <<'EOF'
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --boot-directory=/boot --removable
+update-initramfs -u
+EOF
+echo "[phase] Bootloader installed"
+
+echo "[phase] Image complete"
+echo "PRISM Net raw image: $IMAGE_RAW"

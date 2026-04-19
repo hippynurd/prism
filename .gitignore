@@ -1,0 +1,8 @@
+*.raw
+*.raw.gz
+*.img
+*.img.gz
+rootfs/
+rootfs-net/
+rootfs-net-fm09/
+build/
