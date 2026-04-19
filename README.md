@@ -7,12 +7,16 @@ Own your server again.
 ![PRISM Terminal Banner](assets/prism-banner.png)
 *The PRISM identity banner — displayed on every login*
 
+**P**rivacy · **R**esilience · **I**ndependence · **S**ustainability · **M**odularity
+
 ## What PRISM Is
 PRISM is a private, resilient, independent home server platform for people who want local services without surrendering control. It is built on Debian, designed to stay root-accessible, and meant to explain itself instead of hiding behind appliance theater.
 
 It starts with one box. That matters. PRISM is not built around the assumption that everyone needs a cluster, a rack, or an enterprise budget. The single-server experience is the product. If local AI or heavier workloads justify expansion later, PRISM can grow into that. If not, it should still stand on its own.
 
 PRISM is also honest about hardware. It was born on recycled Dell OptiPlex systems because those machines are cheap, available, and still useful. That does not mean PRISM is trapped there. It works on recycled hardware, old gaming PCs, and brand new machines too. The rule is simple: start with what you have, then be honest about what that hardware can really do.
+
+Its five values are explicit: privacy, resilience, independence, sustainability, and modularity. PRISM is supposed to protect your data, stay understandable under failure, keep you out of lock-in, extend the useful life of real hardware, and adapt honestly as your machine grows or changes.
 
 ## Meet Iris
 Iris is the first face of PRISM.
