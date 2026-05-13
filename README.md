@@ -321,17 +321,24 @@ The tone matters too:
 
 > Leave people less ignorant, or at least entertained.
 
+## Further Reading
+
+- [Why PRISM Exists](docs/philosophy.md)
+- [Iris Personalities](docs/personalities.md)
+
 ## Status
 
 | Component | Status | Notes |
-|---|---|---|
-| PRISM Offline v0.1 | ✅ Complete | Built, compressed, boot tested in VM, Iris responding |
-| PRISM Offline boot test VM | ✅ Complete | Iris responded via nginx, 157 seconds on recycled VM hardware |
-| PRISM Offline boot test real hardware | ⏳ Pending | 7020 bare metal test not yet done |
-| PRISM Net v0.1 | ✅ Complete | Built, verified, compressed (1GB) |
-| PRISM Net boot test | ⏳ Pending | VM and real hardware test not yet done |
-| Native service installers | ✅ Complete | All 6 core services written |
-| GitHub publication | ✅ Live | https://github.com/hippynurd/prism |
+| --- | --- | --- |
+| PRISM Offline v0.1 | Complete | Image built, verified, compressed, checksummed |
+| Offline boot test in VM | Complete | Passed 2026-04-15 on Proxmox VM |
+| Offline boot test on real hardware | Complete | Proven on FM05 (192.168.14.105) |
+| PRISM Net architecture | Complete | First boot flow, prompt, backend, nginx split defined |
+| PRISM Net image build | Complete | prism-net-working-20260502b.raw.gz built and verified |
+| PRISM Net GPU baseline | Complete | 115 (GTX 980 Ti, CUDA 12.2, gpu_usable=true) working |
+| Setup backend integration | In progress | UI reports backend not detected, fix pending |
+| Native service installers | In progress | Scripts written, need hardening |
+| GitHub publication | In progress | README and docs underway |
 
 ## Author
 
