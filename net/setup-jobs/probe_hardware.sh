@@ -100,6 +100,28 @@ def gpu_driver():
         return "nouveau"
     return None
 
+def nvidia_gpus():
+    result = run([
+        "nvidia-smi",
+        "--query-gpu=index,name,memory.total",
+        "--format=csv,noheader,nounits",
+    ])
+    if result.returncode != 0:
+        return []
+    gpus = []
+    for line in result.stdout.strip().splitlines():
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) >= 3:
+            try:
+                gpus.append({
+                    "index": int(parts[0]),
+                    "name": parts[1],
+                    "vram_mb": int(parts[2]),
+                })
+            except ValueError:
+                continue
+    return sorted(gpus, key=lambda g: g["vram_mb"], reverse=True)
+
 def ollama_models():
     result = run(["curl", "-fsS", "http://127.0.0.1:11434/api/tags"], timeout=20)
     if result.returncode != 0:
@@ -129,6 +151,7 @@ def recommended_model(memory_mb):
 
 driver = gpu_driver()
 gpu_ok = bool(driver == "nvidia" and shutil.which("nvidia-smi") and run(["nvidia-smi"]).returncode == 0)
+nvidia_gpu_list = nvidia_gpus() if gpu_ok else []
 ollama_gpu_ready = False
 if gpu_ok:
     active = run(["systemctl", "is-active", "ollama"], timeout=10) if shutil.which("systemctl") else subprocess.CompletedProcess([], 0, "", "")
@@ -147,6 +170,9 @@ state = {
     "gpu_devices": gpu_devices(),
     "gpu_usable": gpu_ok,
     "gpu_driver": driver,
+    "nvidia_gpus": nvidia_gpu_list,
+    "primary_gpu_index": nvidia_gpu_list[0]["index"] if nvidia_gpu_list else None,
+    "agent_gpu_index": nvidia_gpu_list[1]["index"] if len(nvidia_gpu_list) > 1 else None,
     "ollama_model_installed": model_installed(recommended),
     "ollama_gpu_ready": ollama_gpu_ready,
     "recommended_model": recommended,
