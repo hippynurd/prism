@@ -737,26 +737,42 @@ Behavior:
       return { wrap, body };
     }
 
+    function normalizeHardwareState(hardware) {
+      const totalRamMb = hardware.total_ram_mb || hardware.ram_mb || 0;
+      const nics = Array.isArray(hardware.nics) ? hardware.nics : [];
+      const extraDisks = Array.isArray(hardware.extra_disks) ? hardware.extra_disks : [];
+      const gpuDetected = Boolean(hardware.gpu_present || hardware.gpu_detected || hardware.gpu_usable);
+
+      return {
+        totalRamMb,
+        ramGb: totalRamMb ? (totalRamMb / 1024).toFixed(1) : "unknown",
+        extraDiskCount: extraDisks.length,
+        gpuDetected,
+        nicCount: hardware.nic_count || nics.length,
+        recommendedModel: hardware.recommended_model || "unknown"
+      };
+    }
+
     async function detectMode() {
       // Setup mode is detected by the presence of the setup backend. If the backend
       // is absent or unreachable, the same UI falls back to normal assistant mode.
       try {
-        const response = await fetch("/setup/hardware", { method: "GET" });
+        const response = await fetch("/setup/state", { method: "GET" });
         if (!response.ok) {
           throw new Error("setup backend returned " + response.status);
         }
 
         const hardware = await response.json();
+        const normalized = normalizeHardwareState(hardware);
         setMode("setup");
 
-        const ramGb = (hardware.total_ram_mb / 1024).toFixed(1);
         setStatus([
           "Detected mode: setup",
-          "RAM: " + hardware.total_ram_mb + "MB (" + ramGb + "GB)",
-          "Extra disks: " + hardware.extra_disks,
-          "GPU detected: " + (hardware.gpu_detected ? "yes" : "no"),
-          "NICs: " + hardware.nic_count,
-          "Recommended model: " + hardware.recommended_model
+          "RAM: " + normalized.totalRamMb + "MB (" + normalized.ramGb + "GB)",
+          "Extra disks: " + normalized.extraDiskCount,
+          "GPU detected: " + (normalized.gpuDetected ? "yes" : "no"),
+          "NICs: " + normalized.nicCount,
+          "Recommended model: " + normalized.recommendedModel
         ]);
 
         return hardware;
@@ -842,14 +858,14 @@ Behavior:
 
     async function bootConversation(hardware) {
       if (currentMode === "setup" && hardware) {
-        const ramGb = (hardware.total_ram_mb / 1024).toFixed(1);
+        const normalized = normalizeHardwareState(hardware);
         const bootPrompt = [
           "PRISM Net first boot has started.",
           "Detected hardware:",
-          ramGb + "GB RAM,",
-          hardware.extra_disks + " extra disks,",
-          (hardware.gpu_detected ? "GPU present," : "no GPU,"),
-          hardware.nic_count + " network interfaces.",
+          normalized.ramGb + "GB RAM,",
+          normalized.extraDiskCount + " extra disks,",
+          (normalized.gpuDetected ? "GPU present," : "no GPU,"),
+          normalized.nicCount + " network interfaces.",
           "Introduce yourself in one sentence, explain PRISM simply, summarize the hardware, and offer exactly two choices: Just set it up or Let me choose."
         ].join(" ");
 
