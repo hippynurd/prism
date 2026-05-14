@@ -10,13 +10,11 @@ STATE_DIR="/var/lib/prism"
 STATE_FILE="$STATE_DIR/firstboot.done"
 SETUP_COMPLETE_FILE="$STATE_DIR/setup-complete"
 PERSONALITY_FILE="/etc/prism/iris-personality"
-ROOT_PASSWORD_SHA_FILE="$STATE_DIR/root-password.sha256"
 LOG_FILE="/var/log/prism-firstboot.log"
 ASSET_DIR="/usr/local/share/prism"
 SETUP_MODE_FILE="/etc/prism/setup-mode"
 
 OLLAMA_BIN="/usr/local/bin/ollama"
-SETUP_MODEL="llama3.2:1b"
 OLLAMA_SERVICE="ollama"
 BACKEND_SERVICE="prism-setup-backend"
 SETUP_SITE_LINK="/etc/nginx/sites-enabled/prism-setup"
@@ -42,20 +40,15 @@ rm -f "$SETUP_COMPLETE_FILE"
 # even before Iris helps the user pick the final tone in the browser.
 printf 'Friendly\n' > "$PERSONALITY_FILE"
 
-# Use the 1B model for setup on all hardware.
-# Why: it keeps startup fast, leaves plenty of RAM headroom even on 8GB systems,
-# and preserves the product promise that every user meets Iris first.
-echo "[prism] Ensuring Ollama is installed natively"
+# Ollama is installed during image build. First boot should never depend on
+# external DNS or bootstrap downloads before the setup UI is available.
 if [[ ! -x "$OLLAMA_BIN" ]]; then
-  curl -fsSL https://ollama.ai/install.sh | sh
+  echo "[prism] ERROR: expected baked Ollama binary missing at $OLLAMA_BIN"
+  exit 1
 fi
 
 systemctl enable "$OLLAMA_SERVICE"
 systemctl start "$OLLAMA_SERVICE"
-
-echo "[prism] Pulling setup model: $SETUP_MODEL"
-"$OLLAMA_BIN" pull "$SETUP_MODEL"
-echo "[prism] Setup model ready"
 
 # Bring up the browser-facing setup stack.
 # Nginx serves the setup UI on port 80 and proxies both Ollama and the setup
@@ -86,12 +79,11 @@ done
 
 echo "[prism] Setup backend reported completion"
 
-# Generate a one-time root password only after setup completes. This keeps the
-# tty1 completion screen authoritative and avoids surfacing a password too early.
-password="$(openssl rand -base64 24 | tr -d '\n' | tr '/+' 'AZ' | cut -c1-24)"
-printf 'root:%s\n' "$password" | chpasswd
-printf '%s' "$password" | sha256sum | awk '{print $1}' > "$ROOT_PASSWORD_SHA_FILE"
-chmod 600 "$ROOT_PASSWORD_SHA_FILE"
+# Credential policy: first boot must not silently change passwords.
+# The current documented temporary console bootstrap is root / prism, set by
+# the image build. Mothership SSH key access remains available when the image
+# is factory-provisioned.
+echo "[prism] Leaving documented bootstrap credentials unchanged"
 
 # Switch nginx from setup mode to Iris normal mode.
 echo "[prism] Switching nginx from setup mode to Iris normal mode"
@@ -111,7 +103,7 @@ echo "[prism] First boot marked complete"
 # Play the clip once. Audio failure should never block a usable system.
 mpg123 -q "$ASSET_DIR/llama.mp3" 2>/dev/null || true
 
-# Display the final banner and one-time root password on the local console.
+# Display the final banner and documented bootstrap policy on the local console.
 {
   printf '\n'
   printf '\033[1;35m  ██████╗ \033[1;31m██████╗ \033[1;33m██╗\033[1;32m███████╗\033[1;36m███╗   ███╗\033[0m\n'
@@ -123,11 +115,11 @@ mpg123 -q "$ASSET_DIR/llama.mp3" 2>/dev/null || true
   printf '\n'
   printf '\033[1;32m  Your PRISM is ready.\033[0m\n'
   printf '\n'
-  printf "  Setup model used : \033[1;36m$SETUP_MODEL\033[0m\n"
   printf "  Iris personality : \033[1;36m$(cat "$PERSONALITY_FILE" 2>/dev/null || echo Friendly)\033[0m\n"
   printf '\n'
-  printf "  Root password (shown once): \033[1;33m$password\033[0m\n"
-  printf "  Record it now. It will not be shown again.\n"
+  printf "  Console login    : \033[1;33mroot / prism\033[0m\n"
+  printf "  SSH access       : mothership factory key when provisioned\n"
+  printf "  First boot does not randomize or silently change credentials.\n"
   printf '\n'
   printf "  Open browser to \033[1;32mhttp://prism.local\033[0m to meet Iris.\n"
   printf '\n'
