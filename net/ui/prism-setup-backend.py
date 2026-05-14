@@ -302,7 +302,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:  # noqa: N802
-        if self.path == "/hardware":
+        if self.path in ("/hardware", "/state"):
             self._json(hardware_report())
             return
 
