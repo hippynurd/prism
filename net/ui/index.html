@@ -70,10 +70,10 @@
 
     .ascii {
       margin: 0 0 1rem;
-      overflow-x: hidden;
+      overflow-x: auto;
       white-space: pre;
       font-family: var(--mono);
-      font-size: 0.65rem;
+      font-size: 0.8rem;
       line-height: 1.08;
     }
 
@@ -496,14 +496,6 @@ Then summarize detected hardware in plain English using backend data:
 - whether a GPU was found
 - whether more than one network interface was found
 
-Hardware truth rule:
-You will receive a JSON object containing exact hardware facts at the start of every conversation.
-This JSON is the ONLY source of hardware truth.
-Never describe hardware not present in that JSON.
-Never invent GPU names, RAM amounts, or disk counts.
-If the JSON shows GTX 980 Ti, say GTX 980 Ti exactly.
-If a field is missing from the JSON, say you do not have that information.
-
 Opening example shape:
 "I'm Iris. I'll help you bring this PRISM server online privately, one step at a time."
 "I found 16GB of RAM, one extra storage drive, no GPU, and a single network port."
@@ -650,7 +642,7 @@ Behavior:
     const composerNote = document.getElementById("composer-note");
 
     const messages = [];
-    let currentModel = "llama3.2:1b";
+    let currentModel = "llama3.1:8b";
     let currentMode = "normal";
     let currentPrompt = NORMAL_PROMPT;
 
@@ -754,7 +746,6 @@ Behavior:
       return {
         totalRamMb,
         ramGb: totalRamMb ? (totalRamMb / 1024).toFixed(1) : "unknown",
-        extraDisks,
         extraDiskCount: extraDisks.length,
         gpuDetected,
         nicCount: hardware.nic_count || nics.length,
@@ -868,31 +859,20 @@ Behavior:
     async function bootConversation(hardware) {
       if (currentMode === "setup" && hardware) {
         const normalized = normalizeHardwareState(hardware);
-        const visibleMessage = [
+        const bootPrompt = [
           "PRISM Net first boot has started.",
-          "Detected setup state summary:",
+          "Detected hardware:",
           normalized.ramGb + "GB RAM,",
-          normalized.extraDisks.length + " extra disks,",
-          (normalized.gpuDetected ? "GPU present," : "no GPU,"),
-          normalized.nicCount + " network interfaces."
-        ].join(" ");
-        const hiddenContext = [
-          "PRISM Net first boot has started.",
-          "Here is the exact authoritative hardware state JSON. You must only report hardware facts from this JSON and nothing else:",
-          JSON.stringify(hardware),
-          "Detected setup state summary:",
-          normalized.ramGb + "GB RAM,",
-          normalized.extraDisks.length + " extra disks,",
+          normalized.extraDiskCount + " extra disks,",
           (normalized.gpuDetected ? "GPU present," : "no GPU,"),
           normalized.nicCount + " network interfaces.",
-          "Allowed setup jobs: " + (hardware.allowed_jobs || []).join(", ") + ".",
-          "Introduce yourself in one sentence, explain PRISM simply, summarize the hardware truthfully using only the JSON above, and offer exactly two choices: Just set it up or Let me choose."
+          "Introduce yourself in one sentence, explain PRISM simply, summarize the hardware, and offer exactly two choices: Just set it up or Let me choose."
         ].join(" ");
 
         addMessage("system", "PRISM", "Setup backend detected. Iris is entering first-boot setup mode.");
         messages.push({ role: "system", content: currentPrompt });
-        messages.push({ role: "user", content: hiddenContext });
-        addMessage("user", "System Boot", visibleMessage);
+        messages.push({ role: "user", content: bootPrompt });
+        addMessage("user", "System Boot", bootPrompt);
         await streamChat();
         return;
       }
