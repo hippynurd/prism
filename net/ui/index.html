@@ -879,7 +879,7 @@ Behavior:
         const hiddenContext = [
           "PRISM Net first boot has started.",
           "Here is the exact authoritative hardware state JSON. You must only report hardware facts from this JSON and nothing else:",
-          JSON.stringify(hardware, null, 2),
+          JSON.stringify(hardware),
           "Detected setup state summary:",
           normalized.ramGb + "GB RAM,",
           normalized.extraDisks.length + " extra disks,",
