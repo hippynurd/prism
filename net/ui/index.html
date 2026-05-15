@@ -809,6 +809,7 @@ Behavior:
       let raw = "";
       let assistantText = "";
       let firstChunk = true;
+      let assistantBody = null;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -833,16 +834,13 @@ Behavior:
           }
 
           if (firstChunk) {
-            const body = addMessage("assistant", "Iris", "");
-            typing.wrap.remove();
-            typing.body.replaceWith(body);
+            typing.body.textContent = "";
+            assistantBody = typing.body;
             firstChunk = false;
           }
 
           assistantText += fragment;
-          const cards = chatLog.querySelectorAll(".message.assistant .message-body");
-          const currentBody = cards[cards.length - 1];
-          currentBody.textContent = assistantText;
+          assistantBody.textContent = assistantText;
           scrollChat();
         }
       }
