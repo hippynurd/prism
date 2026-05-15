@@ -70,10 +70,10 @@
 
     .ascii {
       margin: 0 0 1rem;
-      overflow-x: auto;
+      overflow-x: hidden;
       white-space: pre;
       font-family: var(--mono);
-      font-size: 0.8rem;
+      font-size: 0.65rem;
       line-height: 1.08;
     }
 
@@ -868,7 +868,15 @@ Behavior:
     async function bootConversation(hardware) {
       if (currentMode === "setup" && hardware) {
         const normalized = normalizeHardwareState(hardware);
-        const bootPrompt = [
+        const visibleMessage = [
+          "PRISM Net first boot has started.",
+          "Detected setup state summary:",
+          normalized.ramGb + "GB RAM,",
+          normalized.extraDisks.length + " extra disks,",
+          (normalized.gpuDetected ? "GPU present," : "no GPU,"),
+          normalized.nicCount + " network interfaces."
+        ].join(" ");
+        const hiddenContext = [
           "PRISM Net first boot has started.",
           "Here is the exact authoritative hardware state JSON. You must only report hardware facts from this JSON and nothing else:",
           JSON.stringify(hardware, null, 2),
@@ -883,8 +891,8 @@ Behavior:
 
         addMessage("system", "PRISM", "Setup backend detected. Iris is entering first-boot setup mode.");
         messages.push({ role: "system", content: currentPrompt });
-        messages.push({ role: "user", content: bootPrompt });
-        addMessage("user", "System Boot", bootPrompt);
+        messages.push({ role: "user", content: hiddenContext });
+        addMessage("user", "System Boot", visibleMessage);
         await streamChat();
         return;
       }
