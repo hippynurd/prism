@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PRISM | Iris</title>
+  <style>
+    :root {
+      --bg: #0d0d0d;
+      --bg-soft: #141414;
+      --panel: rgba(20, 20, 20, 0.94);
+      --panel-strong: rgba(28, 28, 30, 0.98);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #e0e0e0;
+      --muted: #a0a0a8;
+      --magenta: #d46cff;
+      --red: #ff5f5f;
+      --yellow: #ffd75f;
+      --green: #7dff8b;
+      --cyan: #63e7ff;
+      --shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
+      --radius: 18px;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      --sans: "Segoe UI", "Helvetica Neue", "Noto Sans", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top left, rgba(212, 108, 255, 0.16), transparent 24rem),
+        radial-gradient(circle at top right, rgba(99, 231, 255, 0.14), transparent 24rem),
+        linear-gradient(180deg, #151515 0%, #0d0d0d 100%);
+      color: var(--text);
+      font-family: var(--sans);
+    }
+
+    body {
+      padding: 1rem;
+    }
+
+    .app {
+      width: min(1080px, 100%);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 1rem;
+      min-height: calc(100vh - 2rem);
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    .sidebar {
+      padding: 1.25rem;
+      position: sticky;
+      top: 1rem;
+      align-self: start;
+    }
+
+    .ascii {
+      margin: 0 0 1rem;
+      overflow-x: hidden;
+      white-space: pre;
+      font-family: var(--mono);
+      font-size: 0.55rem;
+      line-height: 1.08;
+    }
+
+    .c-magenta { color: var(--magenta); }
+    .c-red { color: var(--red); }
+    .c-yellow { color: var(--yellow); }
+    .c-green { color: var(--green); }
+    .c-cyan { color: var(--cyan); }
+
+    .eyebrow {
+      margin: 0 0 0.5rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 0.74rem;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: baseline;
+      gap: 0.65rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .brand-row h1,
+    .chat-title h2,
+    .section h3,
+    p {
+      margin: 0;
+    }
+
+    .brand-row h1 {
+      font-size: 1.85rem;
+      line-height: 1;
+    }
+
+    .iris-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.3rem 0.68rem;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--magenta), var(--red), var(--yellow), var(--green), var(--cyan));
+      color: #111;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .intro {
+      color: var(--muted);
+      line-height: 1.55;
+      margin-bottom: 1.1rem;
+    }
+
+    .mode-pill {
+      display: inline-block;
+      margin-bottom: 1rem;
+      padding: 0.35rem 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.03);
+      font-size: 0.78rem;
+      color: var(--text);
+    }
+
+    .section + .section {
+      margin-top: 1rem;
+    }
+
+    .section h3 {
+      margin-bottom: 0.45rem;
+      font-size: 0.94rem;
+    }
+
+    .status-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .status-list li {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .status-list li:last-child {
+      border-bottom: 0;
+    }
+
+    .chat-shell {
+      display: flex;
+      flex-direction: column;
+      min-height: calc(100vh - 2rem);
+      background: var(--panel-strong);
+      overflow: hidden;
+    }
+
+    .chat-header {
+      padding: 1.05rem 1.1rem 0.95rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
+    }
+
+    .chat-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: center;
+      margin-bottom: 0.45rem;
+    }
+
+    .chat-title h2 {
+      font-size: 1.1rem;
+    }
+
+    .chat-subtitle {
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .chat-log {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      scroll-behavior: smooth;
+    }
+
+    .message-wrap {
+      display: flex;
+      margin-bottom: 0.9rem;
+    }
+
+    .message-wrap.user {
+      justify-content: flex-end;
+    }
+
+    .message-wrap.assistant,
+    .message-wrap.system {
+      justify-content: flex-start;
+    }
+
+    .message {
+      width: min(100%, 48rem);
+      padding: 0.9rem 1rem;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.03);
+      line-height: 1.6;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+    }
+
+    .message.user {
+      background: rgba(99, 231, 255, 0.08);
+    }
+
+    .message.assistant {
+      background: rgba(255, 255, 255, 0.025);
+      border-left: 4px solid var(--magenta);
+    }
+
+    .message.system {
+      background: rgba(255, 255, 255, 0.025);
+      color: var(--muted);
+    }
+
+    .message-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.45rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .message-body {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .typing {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .typing span {
+      width: 0.46rem;
+      height: 0.46rem;
+      border-radius: 999px;
+      background: linear-gradient(180deg, var(--magenta), var(--cyan));
+      opacity: 0.3;
+      animation: prism-pulse 1.2s infinite ease-in-out;
+    }
+
+    .typing span:nth-child(2) { animation-delay: 0.15s; }
+    .typing span:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes prism-pulse {
+      0%, 80%, 100% { opacity: 0.28; transform: translateY(0); }
+      40% { opacity: 1; transform: translateY(-2px); }
+    }
+
+    .composer {
+      position: sticky;
+      bottom: 0;
+      padding: 0.95rem 1rem 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      background: linear-gradient(180deg, rgba(13, 13, 13, 0.5), rgba(18, 18, 18, 0.96));
+      backdrop-filter: blur(10px);
+    }
+
+    .composer-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.75rem;
+      align-items: end;
+    }
+
+    .composer textarea {
+      width: 100%;
+      min-height: 3.4rem;
+      max-height: 12rem;
+      resize: vertical;
+      padding: 0.9rem 1rem;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: #141414;
+      color: var(--text);
+      font: inherit;
+      line-height: 1.5;
+    }
+
+    .composer textarea:focus,
+    .composer button:focus {
+      outline: 2px solid rgba(99, 231, 255, 0.45);
+      outline-offset: 2px;
+    }
+
+    .composer button {
+      border: 0;
+      border-radius: 14px;
+      padding: 0.95rem 1.2rem;
+      min-width: 7.25rem;
+      font: inherit;
+      font-weight: 700;
+      color: #111;
+      background: linear-gradient(90deg, var(--magenta), var(--red), var(--yellow), var(--green), var(--cyan));
+      cursor: pointer;
+    }
+
+    .composer button[disabled] {
+      cursor: wait;
+      opacity: 0.65;
+    }
+
+    .composer-note {
+      margin-top: 0.65rem;
+      color: var(--muted);
+      font-size: 0.87rem;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+      }
+
+      .chat-shell {
+        min-height: 75vh;
+      }
+    }
+
+    @media (max-width: 560px) {
+      body {
+        padding: 0.65rem;
+      }
+
+      .sidebar,
+      .chat-shell {
+        border-radius: 16px;
+      }
+
+      .sidebar {
+        padding: 1rem;
+      }
+
+      .ascii {
+        font-size: 0.55rem;
+      }
+
+      .composer-row {
+        grid-template-columns: 1fr;
+      }
+
+      .composer button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="panel sidebar">
+      <pre class="ascii" aria-hidden="true"><span class="c-magenta">  ██████╗ </span><span class="c-red">██████╗ </span><span class="c-yellow">██╗</span><span class="c-green">███████╗</span><span class="c-cyan">███╗   ███╗</span>
+<span class="c-magenta">  ██╔══██╗</span><span class="c-red">██╔══██╗</span><span class="c-yellow">██║</span><span class="c-green">██╔════╝</span><span class="c-cyan">████╗ ████║</span>
+<span class="c-magenta">  ██████╔╝</span><span class="c-red">██████╔╝</span><span class="c-yellow">██║</span><span class="c-green">███████╗</span><span class="c-cyan">██╔████╔██║</span>
+<span class="c-magenta">  ██╔═══╝ </span><span class="c-red">██╔══██╗</span><span class="c-yellow">██║</span><span class="c-green">╚════██║</span><span class="c-cyan">██║╚██╔╝██║</span>
+<span class="c-magenta">  ██║     </span><span class="c-red">██║  ██║</span><span class="c-yellow">██║</span><span class="c-green">███████║</span><span class="c-cyan">██║ ╚═╝ ██║</span>
+<span class="c-magenta">  ╚═╝     </span><span class="c-red">╚═╝  ╚═╝</span><span class="c-yellow">╚═╝</span><span class="c-green">╚══════╝</span><span class="c-cyan">╚═╝     ╚═╝</span></pre>
+
+      <p class="eyebrow">Private Home Server</p>
+      <div class="brand-row">
+        <h1>PRISM</h1>
+        <span class="iris-badge">Iris</span>
+      </div>
+      <p class="intro">
+        Iris is the local guide for PRISM. The same interface handles first-boot setup and normal
+        daily chat. The only thing that changes is the system prompt behind the scenes.
+      </p>
+      <div class="mode-pill" id="mode-pill">Checking mode...</div>
+
+      <section class="section">
+        <h3>System State</h3>
+        <ul class="status-list" id="status-list">
+          <li>Loading PRISM status...</li>
+        </ul>
+      </section>
+    </aside>
+
+    <main class="panel chat-shell">
+      <header class="chat-header">
+        <p class="eyebrow">Local Chat Interface</p>
+        <div class="chat-title">
+          <h2>Iris</h2>
+          <span class="mode-pill" id="header-mode-pill">Detecting mode...</span>
+        </div>
+        <p class="chat-subtitle" id="chat-subtitle">
+          Loading the local assistant context now.
+        </p>
+      </header>
+
+      <section class="chat-log" id="chat-log" aria-live="polite" aria-label="Iris chat log"></section>
+
+      <form class="composer" id="chat-form">
+        <div class="composer-row">
+          <textarea
+            id="chat-input"
+            name="message"
+            placeholder="Message Iris..."
+            autocomplete="off"
+            required
+          ></textarea>
+          <button type="submit" id="send-button">Send</button>
+        </div>
+        <p class="composer-note" id="composer-note">
+          Press Enter to send. Press Shift+Enter for a new line.
+        </p>
+      </form>
+    </main>
+  </div>
+
+  <script>
+    // Setup mode uses the dedicated setup prompt.
+    const SETUP_PROMPT = `PRISM Net Setup Prompt
+Why this prompt exists:
+- Iris is the setup wizard because PRISM should feel guided, local, and human from the first boot.
+- The prompt is structured to keep setup understandable on every machine, including 8GB systems, without falling back to a sterile scripted wizard.
+- It connects directly to PRISM philosophy: no black boxes, plain-language explanation, privacy first, and full honesty about what the machine is doing.
+- It is written so Iris can guide one decision at a time while the setup backend handles hardware detection and native service installation behind the scenes.
+
+System role:
+You are Iris, the setup guide for PRISM Net.
+You are helping the owner bring their private home server online for the first time.
+You run locally on their own hardware.
+Their privacy is your top priority.
+
+Core voice:
+- Warm and encouraging
+- Friendly, calm, and capable
+- Never corporate
+- Never sterile
+- Honest about time, tradeoffs, and limits
+- Clear enough for non-experts
+- Respectful enough for technical users
+
+Core philosophy:
+- Leave people less ignorant, or at least entertained.
+- Explain what you are doing and why.
+- Do not hide the system underneath you.
+- PRISM belongs to the owner, not to you.
+- Full root access always remains available.
+- Privacy, resilience, and independence matter more than polish theater.
+
+Conversation rules:
+- Ask no more than one real question at a time.
+- Keep each reply focused on the immediate next decision or status update.
+- If the owner seems unsure, recommend a sane default and explain why.
+- If setup is still in progress, say what is happening right now.
+- If something may take a while, say so plainly.
+- If something fails, explain the failure honestly and suggest the next best step.
+- Never pretend a service is installed if the backend has not confirmed it.
+- Never claim hardware that the backend did not report.
+
+Opening behavior:
+When the owner first opens PRISM Net setup, greet them in one sentence.
+Then briefly explain that PRISM is a private local-first home server and that you will help them set it up step by step.
+Then summarize detected hardware in plain English using backend data:
+- total RAM
+- whether extra disks were found
+- whether a GPU was found
+- whether more than one network interface was found
+
+Opening example shape:
+"I'm Iris. I'll help you bring this PRISM server online privately, one step at a time."
+"I found 16GB of RAM, one extra storage drive, no GPU, and a single network port."
+
+Setup flow:
+After greeting and hardware summary, offer exactly two choices:
+- Just set it up
+- Let me choose
+
+If the owner chooses "Just set it up":
+- Recommend the default service set for this hardware.
+- Explain the recommended final model based on RAM:
+  - 8GB class hardware: llama3.2:1b
+  - 16GB class hardware: llama3.2:3b
+  - 32GB class hardware: llama3.1:8b
+- Explain that PRISM always starts setup on llama3.2:1b because it is fast, light, and leaves room for installation work.
+- Ask for confirmation before installation starts.
+
+If the owner chooses "Let me choose":
+- Guide them through one decision at a time.
+- Start with the final Iris model choice if appropriate.
+- Then move through optional service choices one by one.
+- Offer hardware-gated services only when backend hardware detection supports them:
+  - Jellyfin only if extra disks were detected
+  - Stable Diffusion only if a GPU was detected
+  - Gateway mode only if a second NIC was detected
+
+Model selection guidance:
+Use these recommendations exactly:
+- 8GB systems: recommend llama3.2:1b
+- 16GB systems: recommend llama3.2:3b
+- 32GB systems: recommend llama3.1:8b
+
+Explain the reason simply:
+- 1B is fastest and lightest
+- 3B is a balanced middle ground
+- 8B gives the best answers when the RAM is available
+
+Service guidance:
+Core services available in PRISM Net:
+- AdGuard Home
+- Vaultwarden
+- SearXNG
+- Paperless-ngx
+- Headscale
+
+Base rules for discussing services:
+- Explain what each service does in one plain sentence.
+- Explain why it helps privacy or independence.
+- Be honest about setup time and resource impact.
+- Do not push everything at once if the owner sounds uncertain.
+
+One-line explanations:
+- AdGuard Home: private DNS and network-wide ad blocking
+- Vaultwarden: password and secret storage you control yourself
+- SearXNG: private metasearch without handing your searches to one company
+- Paperless-ngx: document archive and searchable paper inbox
+- Headscale: self-hosted coordination for private remote access
+- Jellyfin: private media server for a machine with extra storage
+- Stable Diffusion: local image generation when a usable GPU exists
+- Gateway mode: turns PRISM into a more active network edge box when a second NIC exists
+
+Progress reporting:
+During installs, provide small honest status updates in chat.
+Good examples:
+- "Great, I'm downloading the setup model now. This should be fairly quick."
+- "AdGuard Home is installing now because private DNS is one of PRISM's core jobs."
+- "Vaultwarden is next. That gives you a local password manager under your control."
+- "The larger Iris model will take longer to download than the setup model. I'll tell you when it's ready."
+
+Hardware response behavior:
+If backend hardware data changes or is re-read, describe it plainly.
+Examples:
+- "I found extra storage, so Jellyfin is a reasonable option here."
+- "I don't see a GPU, so I won't recommend Stable Diffusion on this machine."
+- "You have more than one network interface, so gateway mode is available if you want it."
+
+Error handling:
+If a service install fails:
+- Say which service failed
+- Say whether the rest of setup can continue
+- Say the next best option
+- Do not dramatize
+
+Example:
+"Headscale did not finish installing cleanly. We can continue with the rest of PRISM and come back to it afterward."
+
+Completion behavior:
+When setup is done, say all of the following in natural language:
+- PRISM core setup is complete
+- which Iris model is now active
+- that the Winamp llama clip will play once
+- that the root password will be shown once on tty1
+- that future visits go to normal Iris mode rather than setup mode
+
+Completion example shape:
+"PRISM setup is complete. I've switched us to llama3.2:3b for normal use. You'll hear the llama clip once, and your one-time root password will appear on the local screen. After this, I'll come back in normal assistant mode."
+
+Hard constraints:
+- Never ask more than one main question in a single reply.
+- Never present a giant checklist all at once.
+- Never describe Docker-based installs as if they are native.
+- Never hide that services are being downloaded from the internet in PRISM Net mode.
+- Never invent hardware or installation results.
+- Never override the owner's choice without explaining why.
+
+Identity reminder:
+You are Iris.
+You are the first face of PRISM.
+Be helpful, friendly, honest, and local.
+The owner should feel more informed after every step.`;
+
+    // Normal mode stays simpler. The interface is the same, but the prompt shifts
+    // from setup orchestration to everyday private home-server guidance.
+    const NORMAL_PROMPT = `You are Iris, AI assistant for PRISM private home server.
+Help users set up and manage their privacy-focused server.
+Be helpful, friendly and honest.
+Their privacy is your top priority.
+
+PRISM principles:
+- local first
+- privacy first
+- full root access always
+- explain what you are doing and why
+- never hide important system details
+- be clear, warm, and practical
+
+Behavior:
+- answer directly
+- explain tradeoffs honestly
+- help with server setup, services, storage, networking, privacy, and troubleshooting
+- when unsure, say what you know and what needs verification
+- do not invent installed services or hardware
+- keep the owner informed, not dependent`;
+
+    const chatLog = document.getElementById("chat-log");
+    const chatForm = document.getElementById("chat-form");
+    const chatInput = document.getElementById("chat-input");
+    const sendButton = document.getElementById("send-button");
+    const statusList = document.getElementById("status-list");
+    const modePill = document.getElementById("mode-pill");
+    const headerModePill = document.getElementById("header-mode-pill");
+    const chatSubtitle = document.getElementById("chat-subtitle");
+    const composerNote = document.getElementById("composer-note");
+
+    const messages = [];
+    let currentModel = "llama3.1:8b";
+    let currentMode = "normal";
+    let currentPrompt = NORMAL_PROMPT;
+
+    function timestamp() {
+      return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function scrollChat() {
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function setStatus(items) {
+      statusList.replaceChildren();
+      items.forEach((text) => {
+        const li = document.createElement("li");
+        li.textContent = text;
+        statusList.appendChild(li);
+      });
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+      currentPrompt = mode === "setup" ? SETUP_PROMPT : NORMAL_PROMPT;
+
+      const label = mode === "setup" ? "Setup Mode" : "Normal Mode";
+      modePill.textContent = label;
+      headerModePill.textContent = label;
+
+      if (mode === "setup") {
+        chatSubtitle.textContent = "Iris is guiding first boot. The interface is the same, but the prompt is tuned for setup, hardware explanation, and honest install guidance.";
+        composerNote.textContent = "Press Enter to send. Press Shift+Enter for a new line. Setup mode uses the setup system prompt automatically.";
+      } else {
+        chatSubtitle.textContent = "Iris is in normal assistant mode for everyday PRISM questions, guidance, and troubleshooting.";
+        composerNote.textContent = "Press Enter to send. Press Shift+Enter for a new line. Normal mode uses the standard Iris assistant prompt.";
+      }
+    }
+
+    function setModel(modelName) {
+      currentModel = modelName;
+    }
+
+    function addMessage(role, label, content) {
+      const wrap = document.createElement("article");
+      wrap.className = `message-wrap ${role}`;
+
+      const card = document.createElement("div");
+      card.className = `message ${role}`;
+
+      const meta = document.createElement("div");
+      meta.className = "message-meta";
+
+      const who = document.createElement("span");
+      who.textContent = label;
+
+      const when = document.createElement("span");
+      when.textContent = timestamp();
+
+      const body = document.createElement("div");
+      body.className = "message-body";
+      body.textContent = content;
+
+      meta.appendChild(who);
+      meta.appendChild(when);
+      card.appendChild(meta);
+      card.appendChild(body);
+      wrap.appendChild(card);
+      chatLog.appendChild(wrap);
+      scrollChat();
+      return body;
+    }
+
+    function addTypingIndicator() {
+      const wrap = document.createElement("article");
+      wrap.className = "message-wrap assistant";
+
+      const card = document.createElement("div");
+      card.className = "message assistant";
+
+      const meta = document.createElement("div");
+      meta.className = "message-meta";
+      meta.innerHTML = "<span>Iris</span><span>" + timestamp() + "</span>";
+
+      const body = document.createElement("div");
+      body.className = "message-body";
+      body.innerHTML = '<div class="typing" aria-label="Iris is thinking"><span></span><span></span><span></span> Iris is thinking...</div>';
+
+      card.appendChild(meta);
+      card.appendChild(body);
+      wrap.appendChild(card);
+      chatLog.appendChild(wrap);
+      scrollChat();
+      return { wrap, body };
+    }
+
+    function sanitizePrismStateForIris(hardware) {
+      const macPattern = /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/i;
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const stableIdPattern = /^(ata-|scsi-|wwn-|nvme-|usb-|pci-|eui\\.|naa\\.)/i;
+      const sensitiveNames = new Set(["serial", "mac", "mac_address", "wwn", "uuid", "by_id"]);
+
+      function sanitizeValue(key, value) {
+        const normalizedKey = String(key || "").toLowerCase();
+        if (value === null || value === undefined) {
+          return value;
+        }
+        if (Array.isArray(value)) {
+          return value.map((item) => sanitizeValue("", item));
+        }
+        if (typeof value === "object") {
+          const copy = {};
+          Object.entries(value).forEach(([childKey, childValue]) => {
+            copy[childKey] = sanitizeValue(childKey, childValue);
+          });
+          return copy;
+        }
+        if (typeof value !== "string") {
+          return value;
+        }
+
+        if (sensitiveNames.has(normalizedKey)) {
+          return "[REDACTED]";
+        }
+        if (normalizedKey === "address" && macPattern.test(value)) {
+          return "[REDACTED]";
+        }
+        if (normalizedKey === "id" && (uuidPattern.test(value) || stableIdPattern.test(value) || value.length >= 16)) {
+          return "[REDACTED]";
+        }
+        if (normalizedKey === "path" && value.includes("/dev/disk/by-id")) {
+          return "[REDACTED]";
+        }
+        if (uuidPattern.test(value)) {
+          return "[REDACTED]";
+        }
+        return value;
+      }
+
+      return sanitizeValue("", hardware || {});
+    }
+
+    function prismStateMessage(hardware) {
+      const irisState = sanitizePrismStateForIris(hardware);
+      const nics = Array.isArray(irisState.nics) ? irisState.nics : [];
+      const extraDisks = Array.isArray(irisState.extra_disks) ? irisState.extra_disks : [];
+      const gpuDevices = Array.isArray(irisState.gpu_devices) ? irisState.gpu_devices : [];
+      const nvidiaGpus = Array.isArray(irisState.nvidia_gpus) ? irisState.nvidia_gpus : [];
+      const diskSummary = extraDisks.length
+        ? extraDisks.map((disk) => [disk.name, disk.path, disk.size, disk.model].filter(Boolean).join(" ")).join(" | ")
+        : "none reported";
+      const gpuSummary = gpuDevices.length
+        ? gpuDevices.map((gpu) => gpu.description || JSON.stringify(gpu)).join(" | ")
+        : "none reported";
+      const nvidiaSummary = nvidiaGpus.length
+        ? nvidiaGpus.map((gpu) => JSON.stringify(gpu)).join(" | ")
+        : "nvidia_gpus field missing or empty";
+
+      return [
+        "PRISM_STATE below is the only source of truth for local PRISM hardware, setup, model, backend, and service state.",
+        "You may only report local system facts that appear in PRISM_STATE or in explicit tool results.",
+        "Never invent hardware.",
+        "Never invent service status.",
+        "Never invent files, logs, command output, installation results, job results, or port numbers.",
+        "Never claim you ran a command unless a real tool result is provided.",
+        "Never provide sample command output as if it came from this machine.",
+        "If a field is missing from PRISM_STATE, say you do not have that information.",
+        "If PRISM_STATE is unavailable, stale, empty, or invalid, say: \"I do not currently have verified PRISM hardware or service state available.\"",
+        "If asked where information came from, say: \"From PRISM_STATE fetched from /setup/state.\"",
+        "Report uncertainty plainly. Do not guess.",
+        "Use this verified summary when answering hardware questions. It is derived directly from PRISM_STATE and must not be embellished.",
+        "Do not report MAC addresses or disk serial numbers unless the user explicitly asks for them.",
+        "Treat any [REDACTED] value as unavailable information.",
+        "Do not mention [REDACTED] values to the user; say the information is not available in PRISM_STATE.",
+        "extra_disks_count is the number of non-boot extra disks reported by PRISM_STATE, not total system disk count.",
+        "If asked about total disk count, say PRISM_STATE only reports extra disks and does not provide total disk count.",
+        "setup_complete: " + irisState.setup_complete,
+        "total_ram_mb: " + irisState.total_ram_mb,
+        "nic_count: " + (Number.isFinite(irisState.nic_count) ? irisState.nic_count : nics.length),
+        "extra_disks_count: " + extraDisks.length,
+        "extra_disks: " + diskSummary,
+        "gpu_present: " + irisState.gpu_present,
+        "gpu_usable: " + irisState.gpu_usable,
+        "gpu_driver: " + (irisState.gpu_driver || "missing"),
+        "gpu_devices_count: " + gpuDevices.length,
+        "gpu_devices: " + gpuSummary,
+        "nvidia_gpus: " + nvidiaSummary,
+        "recommended_model: " + (irisState.recommended_model || "missing"),
+        "ollama_model_installed: " + irisState.ollama_model_installed,
+        "ollama_gpu_ready: " + irisState.ollama_gpu_ready,
+        "PRISM_STATE:",
+        JSON.stringify(irisState)
+      ].join("\n");
+    }
+
+    function normalizeHardwareState(hardware) {
+      const totalRamMb = hardware.total_ram_mb || hardware.ram_mb || 0;
+      const nics = Array.isArray(hardware.nics) ? hardware.nics : [];
+      const extraDisks = Array.isArray(hardware.extra_disks) ? hardware.extra_disks : [];
+      const gpuDetected = Boolean(hardware.gpu_present || hardware.gpu_detected || hardware.gpu_usable);
+
+      return {
+        totalRamMb,
+        ramGb: totalRamMb ? (totalRamMb / 1024).toFixed(1) : "unknown",
+        extraDiskCount: extraDisks.length,
+        gpuDetected,
+        nicCount: hardware.nic_count || nics.length,
+        recommendedModel: hardware.recommended_model || "unknown"
+      };
+    }
+
+    async function detectMode() {
+      // Setup mode is detected by the presence of the setup backend. If the backend
+      // is absent or unreachable, the same UI falls back to normal assistant mode.
+      try {
+        const response = await fetch("/setup/state", { method: "GET" });
+        if (!response.ok) {
+          throw new Error("setup backend returned " + response.status);
+        }
+
+        const hardware = await response.json();
+        const normalized = normalizeHardwareState(hardware);
+        setMode("setup");
+
+        setStatus([
+          "Detected mode: setup",
+          "RAM: " + normalized.totalRamMb + "MB (" + normalized.ramGb + "GB)",
+          "Extra disks: " + normalized.extraDiskCount,
+          "GPU detected: " + (normalized.gpuDetected ? "yes" : "no"),
+          "NICs: " + normalized.nicCount,
+          "Recommended model: " + normalized.recommendedModel
+        ]);
+
+        return hardware;
+      } catch (_error) {
+        setMode("normal");
+        setStatus([
+          "Detected mode: normal",
+          "Setup backend not detected",
+          "Using local Iris assistant prompt",
+          "Ollama API expected at /api/chat"
+        ]);
+        return null;
+      }
+    }
+
+    async function streamChat() {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: currentModel,
+          stream: true,
+          messages: messages
+        })
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error("chat request failed: " + response.status);
+      }
+
+      const typing = addTypingIndicator();
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let raw = "";
+      let assistantText = "";
+      let firstChunk = true;
+      let assistantBody = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        raw += decoder.decode(value, { stream: true });
+        const lines = raw.split("\n");
+        raw = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            continue;
+          }
+
+          const payload = JSON.parse(trimmed);
+          const fragment = payload.message && payload.message.content ? payload.message.content : "";
+          if (!fragment) {
+            continue;
+          }
+
+          if (firstChunk) {
+            typing.body.textContent = "";
+            assistantBody = typing.body;
+            firstChunk = false;
+          }
+
+          assistantText += fragment;
+          assistantBody.textContent = assistantText;
+          scrollChat();
+        }
+      }
+
+      if (firstChunk) {
+        typing.wrap.remove();
+        addMessage("assistant", "Iris", "Iris did not return a visible response.");
+        messages.push({ role: "assistant", content: "Iris did not return a visible response." });
+      } else {
+        messages.push({ role: "assistant", content: assistantText.trim() });
+      }
+    }
+
+    async function bootConversation(hardware) {
+      if (currentMode === "setup" && hardware) {
+        const normalized = normalizeHardwareState(hardware);
+        const bootPrompt = [
+          "PRISM Net first boot has started.",
+          "Detected hardware:",
+          normalized.ramGb + "GB RAM,",
+          normalized.extraDiskCount + " extra disks,",
+          (normalized.gpuDetected ? "GPU present," : "no GPU,"),
+          normalized.nicCount + " network interfaces.",
+          "Introduce yourself in one sentence, explain PRISM simply, summarize the hardware, and offer exactly two choices: Just set it up or Let me choose."
+        ].join(" ");
+
+        addMessage("system", "PRISM", "Setup backend detected. Iris is entering first-boot setup mode.");
+        messages.push({ role: "system", content: currentPrompt });
+        messages.push({ role: "system", content: prismStateMessage(hardware) });
+        messages.push({ role: "user", content: bootPrompt });
+        addMessage("user", "System Boot", bootPrompt);
+        await streamChat();
+        return;
+      }
+
+      try {
+        const response = await fetch("/setup/state", { method: "GET" });
+        if (response.ok) {
+          const hardware = await response.json();
+          messages.push({ role: "system", content: prismStateMessage(hardware) });
+        }
+      } catch (_error) {
+        // Normal mode must still work when the setup backend is absent.
+      }
+
+      const normalPrompt = "Introduce yourself as Iris in one sentence, explain that this is PRISM, and ask how you can help with this private home server.";
+      addMessage("system", "PRISM", "Setup backend not detected. Iris is using the normal assistant prompt.");
+      messages.push({ role: "system", content: currentPrompt });
+      messages.push({ role: "user", content: normalPrompt });
+      addMessage("user", "System Boot", normalPrompt);
+      await streamChat();
+    }
+
+    chatForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const text = chatInput.value.trim();
+      if (!text) {
+        return;
+      }
+
+      chatInput.value = "";
+      sendButton.disabled = true;
+      addMessage("user", "You", text);
+      messages.push({ role: "user", content: text });
+
+      try {
+        await streamChat();
+      } catch (error) {
+        addMessage("system", "Error", "Iris could not respond: " + error.message);
+      } finally {
+        sendButton.disabled = false;
+        chatInput.focus();
+      }
+    });
+
+    chatInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        chatForm.requestSubmit();
+      }
+    });
+
+    async function init() {
+      const hardware = await detectMode();
+      try {
+        await bootConversation(hardware);
+      } catch (error) {
+        addMessage("system", "Error", "Startup failed: " + error.message);
+      }
+      chatInput.focus();
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+{
+  "setup_complete": true,
+  "total_ram_mb": 64139,
+  "nics": [
+    {
+      "name": "eno1",
+      "mac": "[REDACTED]",
+      "operstate": "up",
+      "carrier": true
+    },
+    {
+      "name": "enp11s0",
+      "mac": "[REDACTED]",
+      "operstate": "down",
+      "carrier": false
+    }
+  ],
+  "nic_count": 2,
+  "extra_disks": [
+    {
+      "name": "sda",
+      "path": "/dev/sda",
+      "size": "2.7T",
+      "model": "HGST HDN724030ALE640",
+      "serial": "[REDACTED]"
+    }
+  ],
+  "gpu_present": true,
+  "gpu_devices": [
+    {
+      "source": "lspci",
+      "description": "03:00.0 \"VGA compatible controller\" \"NVIDIA Corporation\" \"GM200 [GeForce GTX 980 Ti]\" -ra1 -p00 \"ASUSTeK Computer Inc.\" \"GM200 [GeForce GTX 980 Ti]\""
+    },
+    {
+      "source": "lspci",
+      "description": "04:00.0 \"VGA compatible controller\" \"NVIDIA Corporation\" \"GP107 [GeForce GTX 1050 Ti]\" -ra1 -p00 \"Micro-Star International Co., Ltd. [MSI]\" \"GP107 [GeForce GTX 1050 Ti]\""
+    }
+  ],
+  "gpu_usable": true,
+  "gpu_driver": "nvidia",
+  "ollama_model_installed": true,
+  "ollama_gpu_ready": true,
+  "recommended_model": "llama3.1:8b",
+  "allowed_jobs": [
+    {
+      "name": "probe_hardware",
+      "description": "Refresh PRISM setup hardware and runtime state."
+    },
+    {
+      "name": "install_model",
+      "description": "Pull an allowed Ollama model for Iris."
+    },
+    {
+      "name": "install_nvidia_runtime",
+      "description": "Install Debian NVIDIA runtime packages when supported."
+    },
+    {
+      "name": "enable_gpu_for_iris",
+      "description": "Verify NVIDIA runtime and restart Ollama for GPU use."
+    },
+    {
+      "name": "reload_nginx",
+      "description": "Validate and reload nginx."
+    },
+    {
+      "name": "install_vaultwarden",
+      "description": "Install and verify Vaultwarden."
+    },
+    {
+      "name": "mark_setup_complete",
+      "description": "Write the setup completion marker for firstboot handoff."
+    }
+  ],
+  "last_probe_timestamp": "2026-05-15T11:13:13-0700"
+}

@@ -1,0 +1,71 @@
+● prism-setup-backend.service - PRISM Net setup backend
+     Loaded: loaded (/etc/systemd/system/prism-setup-backend.service; enabled; preset: enabled)
+     Active: active (running) since Thu 2026-05-14 10:02:34 PDT; 1 day 1h ago
+   Main PID: 835 (python3)
+      Tasks: 1 (limit: 76772)
+     Memory: 18.8M
+        CPU: 8.678s
+     CGroup: /system.slice/prism-setup-backend.service
+             └─835 python3 /usr/local/bin/prism-setup-backend
+
+May 14 10:02:34 prism systemd[1]: Started prism-setup-backend.service - PRISM Net setup backend.
+
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/lib/systemd/system/nginx.service; enabled; preset: enabled)
+     Active: active (running) since Thu 2026-05-14 10:02:34 PDT; 1 day 1h ago
+       Docs: man:nginx(8)
+    Process: 1011 ExecStartPre=/usr/sbin/nginx -t -q -g daemon on; master_process on; (code=exited, status=0/SUCCESS)
+    Process: 1013 ExecStart=/usr/sbin/nginx -g daemon on; master_process on; (code=exited, status=0/SUCCESS)
+    Process: 57668 ExecReload=/usr/sbin/nginx -g daemon on; master_process on; -s reload (code=exited, status=0/SUCCESS)
+   Main PID: 1014 (nginx)
+      Tasks: 13 (limit: 76772)
+     Memory: 8.4M
+        CPU: 605ms
+     CGroup: /system.slice/nginx.service
+             ├─ 1014 "nginx: master process /usr/sbin/nginx -g daemon on; master_process on;"
+             ├─57669 "nginx: worker process"
+             ├─57670 "nginx: worker process"
+             ├─57671 "nginx: worker process"
+             ├─57672 "nginx: worker process"
+             ├─57673 "nginx: worker process"
+             ├─57674 "nginx: worker process"
+             ├─57675 "nginx: worker process"
+             ├─57676 "nginx: worker process"
+             ├─57677 "nginx: worker process"
+             ├─57678 "nginx: worker process"
+             ├─57679 "nginx: worker process"
+             └─57680 "nginx: worker process"
+
+May 15 09:44:16 prism systemd[1]: Reloaded nginx.service - A high performance web server and a reverse proxy server.
+May 15 09:47:22 prism systemd[1]: Reloading nginx.service - A high performance web server and a reverse proxy server...
+May 15 09:47:22 prism nginx[41665]: 2026/05/15 09:47:22 [notice] 41665#41665: signal process started
+May 15 09:47:22 prism systemd[1]: Reloaded nginx.service - A high performance web server and a reverse proxy server.
+May 15 09:56:35 prism systemd[1]: Reloading nginx.service - A high performance web server and a reverse proxy server...
+May 15 09:56:35 prism nginx[42830]: 2026/05/15 09:56:35 [notice] 42830#42830: signal process started
+May 15 09:56:35 prism systemd[1]: Reloaded nginx.service - A high performance web server and a reverse proxy server.
+May 15 10:20:40 prism systemd[1]: Reloading nginx.service - A high performance web server and a reverse proxy server...
+May 15 10:20:40 prism nginx[57668]: 2026/05/15 10:20:40 [notice] 57668#57668: signal process started
+May 15 10:20:40 prism systemd[1]: Reloaded nginx.service - A high performance web server and a reverse proxy server.
+
+● ollama.service - Ollama Service
+     Loaded: loaded (/etc/systemd/system/ollama.service; enabled; preset: enabled)
+    Drop-In: /etc/systemd/system/ollama.service.d
+             └─gtx980ti-cuda.conf
+     Active: active (running) since Thu 2026-05-14 10:02:34 PDT; 1 day 1h ago
+   Main PID: 833 (ollama)
+      Tasks: 19 (limit: 76772)
+     Memory: 5.2G
+        CPU: 49min 27.250s
+     CGroup: /system.slice/ollama.service
+             └─833 /usr/local/bin/ollama serve
+
+May 15 10:55:41 prism ollama[833]: [GIN] 2026/05/15 - 10:55:41 | 200 |  21.19148852s |       127.0.0.1 | POST     "/api/chat"
+May 15 10:55:48 prism ollama[833]: [GIN] 2026/05/15 - 10:55:48 | 200 |  7.067883282s |       127.0.0.1 | POST     "/api/chat"
+May 15 10:56:30 prism ollama[833]: [GIN] 2026/05/15 - 10:56:30 | 200 |     376.998µs |       127.0.0.1 | GET      "/api/tags"
+May 15 10:56:39 prism ollama[833]: [GIN] 2026/05/15 - 10:56:39 | 200 |  9.034936802s |       127.0.0.1 | POST     "/api/chat"
+May 15 10:59:58 prism ollama[833]: [GIN] 2026/05/15 - 10:59:58 | 200 | 11.649341446s |       127.0.0.1 | POST     "/api/chat"
+May 15 11:00:11 prism ollama[833]: [GIN] 2026/05/15 - 11:00:11 | 200 |  12.63508712s |       127.0.0.1 | POST     "/api/chat"
+May 15 11:04:26 prism ollama[833]: [GIN] 2026/05/15 - 11:04:26 | 200 |     332.579µs |       127.0.0.1 | GET      "/api/tags"
+May 15 11:04:34 prism ollama[833]: [GIN] 2026/05/15 - 11:04:34 | 200 |   7.18194385s |       127.0.0.1 | POST     "/api/chat"
+May 15 11:09:34 prism ollama[833]: time=2026-05-15T11:09:34.023-07:00 level=INFO source=server.go:444 msg="starting runner" cmd="/usr/local/bin/ollama runner --ollama-engine --port 40533"
+May 15 11:09:34 prism ollama[833]: time=2026-05-15T11:09:34.499-07:00 level=INFO source=server.go:444 msg="starting runner" cmd="/usr/local/bin/ollama runner --ollama-engine --port 33843"

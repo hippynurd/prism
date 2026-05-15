@@ -1,0 +1,5 @@
+25406f3 fix: add missing-state Iris fallback
+1320e76 fix: sanitize PRISM state before Iris prompt
+a5abe0e fix: ground Iris responses in PRISM state
+5515228 Fix: inject hardware JSON in normal mode to stop hallucination
+21fb110 Fix: reduce ASCII logo font size to fit sidebar
