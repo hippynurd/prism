@@ -875,6 +875,19 @@ Behavior:
         return;
       }
 
+      try {
+        const response = await fetch("/setup/state", { method: "GET" });
+        if (response.ok) {
+          const hardware = await response.json();
+          messages.push({
+            role: "system",
+            content: "Here is the exact hardware state of this machine. You must only report hardware facts from this data and nothing else. Never invent GPU names, RAM amounts, or any hardware details not present here: " + JSON.stringify(hardware)
+          });
+        }
+      } catch (_error) {
+        // Normal mode must still work when the setup backend is absent.
+      }
+
       const normalPrompt = "Introduce yourself as Iris in one sentence, explain that this is PRISM, and ask how you can help with this private home server.";
       addMessage("system", "PRISM", "Setup backend not detected. Iris is using the normal assistant prompt.");
       messages.push({ role: "system", content: currentPrompt });
