@@ -836,6 +836,16 @@ Behavior:
       ].join("\n");
     }
 
+    function prismStateUnavailableMessage() {
+      return [
+        "PRISM_STATE is unavailable.",
+        "You do not currently have verified PRISM hardware or service state available.",
+        "Do not invent hardware, services, files, logs, command output, installation results, job results, port numbers, or command output.",
+        "If asked about local hardware or installed services, say you do not currently have verified PRISM state available.",
+        "Do not suggest commands unless the user asks how to troubleshoot or inspect the system manually."
+      ].join("\n");
+    }
+
     function normalizeHardwareState(hardware) {
       const totalRamMb = hardware.total_ram_mb || hardware.ram_mb || 0;
       const nics = Array.isArray(hardware.nics) ? hardware.nics : [];
@@ -977,11 +987,13 @@ Behavior:
 
       try {
         const response = await fetch("/setup/state", { method: "GET" });
-        if (response.ok) {
-          const hardware = await response.json();
-          messages.push({ role: "system", content: prismStateMessage(hardware) });
+        if (!response.ok) {
+          throw new Error("setup backend returned " + response.status);
         }
+        const hardware = await response.json();
+        messages.push({ role: "system", content: prismStateMessage(hardware) });
       } catch (_error) {
+        messages.push({ role: "system", content: prismStateUnavailableMessage() });
         // Normal mode must still work when the setup backend is absent.
       }
 
