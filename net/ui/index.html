@@ -496,6 +496,14 @@ Then summarize detected hardware in plain English using backend data:
 - whether a GPU was found
 - whether more than one network interface was found
 
+Hardware truth rule:
+You will receive a JSON object containing exact hardware facts at the start of every conversation.
+This JSON is the ONLY source of hardware truth.
+Never describe hardware not present in that JSON.
+Never invent GPU names, RAM amounts, or disk counts.
+If the JSON shows GTX 980 Ti, say GTX 980 Ti exactly.
+If a field is missing from the JSON, say you do not have that information.
+
 Opening example shape:
 "I'm Iris. I'll help you bring this PRISM server online privately, one step at a time."
 "I found 16GB of RAM, one extra storage drive, no GPU, and a single network port."
@@ -746,6 +754,7 @@ Behavior:
       return {
         totalRamMb,
         ramGb: totalRamMb ? (totalRamMb / 1024).toFixed(1) : "unknown",
+        extraDisks,
         extraDiskCount: extraDisks.length,
         gpuDetected,
         nicCount: hardware.nic_count || nics.length,
@@ -861,12 +870,15 @@ Behavior:
         const normalized = normalizeHardwareState(hardware);
         const bootPrompt = [
           "PRISM Net first boot has started.",
-          "Detected hardware:",
+          "Here is the exact authoritative hardware state JSON. You must only report hardware facts from this JSON and nothing else:",
+          JSON.stringify(hardware, null, 2),
+          "Detected setup state summary:",
           normalized.ramGb + "GB RAM,",
-          normalized.extraDiskCount + " extra disks,",
+          normalized.extraDisks.length + " extra disks,",
           (normalized.gpuDetected ? "GPU present," : "no GPU,"),
           normalized.nicCount + " network interfaces.",
-          "Introduce yourself in one sentence, explain PRISM simply, summarize the hardware, and offer exactly two choices: Just set it up or Let me choose."
+          "Allowed setup jobs: " + (hardware.allowed_jobs || []).join(", ") + ".",
+          "Introduce yourself in one sentence, explain PRISM simply, summarize the hardware truthfully using only the JSON above, and offer exactly two choices: Just set it up or Let me choose."
         ].join(" ");
 
         addMessage("system", "PRISM", "Setup backend detected. Iris is entering first-boot setup mode.");
