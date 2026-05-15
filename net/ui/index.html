@@ -737,6 +737,54 @@ Behavior:
       return { wrap, body };
     }
 
+    function prismStateMessage(hardware) {
+      const nics = Array.isArray(hardware.nics) ? hardware.nics : [];
+      const extraDisks = Array.isArray(hardware.extra_disks) ? hardware.extra_disks : [];
+      const gpuDevices = Array.isArray(hardware.gpu_devices) ? hardware.gpu_devices : [];
+      const nvidiaGpus = Array.isArray(hardware.nvidia_gpus) ? hardware.nvidia_gpus : [];
+      const diskSummary = extraDisks.length
+        ? extraDisks.map((disk) => [disk.name, disk.path, disk.size, disk.model].filter(Boolean).join(" ")).join(" | ")
+        : "none reported";
+      const gpuSummary = gpuDevices.length
+        ? gpuDevices.map((gpu) => gpu.description || JSON.stringify(gpu)).join(" | ")
+        : "none reported";
+      const nvidiaSummary = nvidiaGpus.length
+        ? nvidiaGpus.map((gpu) => JSON.stringify(gpu)).join(" | ")
+        : "nvidia_gpus field missing or empty";
+
+      return [
+        "PRISM_STATE below is the only source of truth for local PRISM hardware, setup, model, backend, and service state.",
+        "You may only report local system facts that appear in PRISM_STATE or in explicit tool results.",
+        "Never invent hardware.",
+        "Never invent service status.",
+        "Never invent files, logs, command output, installation results, job results, or port numbers.",
+        "Never claim you ran a command unless a real tool result is provided.",
+        "Never provide sample command output as if it came from this machine.",
+        "If a field is missing from PRISM_STATE, say you do not have that information.",
+        "If PRISM_STATE is unavailable, stale, empty, or invalid, say: \"I do not currently have verified PRISM hardware or service state available.\"",
+        "If asked where information came from, say: \"From PRISM_STATE fetched from /setup/state.\"",
+        "Report uncertainty plainly. Do not guess.",
+        "Use this verified summary when answering hardware questions. It is derived directly from PRISM_STATE and must not be embellished.",
+        "Do not report MAC addresses or disk serial numbers unless the user explicitly asks for them.",
+        "setup_complete: " + hardware.setup_complete,
+        "total_ram_mb: " + hardware.total_ram_mb,
+        "nic_count: " + (Number.isFinite(hardware.nic_count) ? hardware.nic_count : nics.length),
+        "extra_disks_count: " + extraDisks.length,
+        "extra_disks: " + diskSummary,
+        "gpu_present: " + hardware.gpu_present,
+        "gpu_usable: " + hardware.gpu_usable,
+        "gpu_driver: " + (hardware.gpu_driver || "missing"),
+        "gpu_devices_count: " + gpuDevices.length,
+        "gpu_devices: " + gpuSummary,
+        "nvidia_gpus: " + nvidiaSummary,
+        "recommended_model: " + (hardware.recommended_model || "missing"),
+        "ollama_model_installed: " + hardware.ollama_model_installed,
+        "ollama_gpu_ready: " + hardware.ollama_gpu_ready,
+        "PRISM_STATE:",
+        JSON.stringify(hardware)
+      ].join("\n");
+    }
+
     function normalizeHardwareState(hardware) {
       const totalRamMb = hardware.total_ram_mb || hardware.ram_mb || 0;
       const nics = Array.isArray(hardware.nics) ? hardware.nics : [];
@@ -869,6 +917,7 @@ Behavior:
 
         addMessage("system", "PRISM", "Setup backend detected. Iris is entering first-boot setup mode.");
         messages.push({ role: "system", content: currentPrompt });
+        messages.push({ role: "system", content: prismStateMessage(hardware) });
         messages.push({ role: "user", content: bootPrompt });
         addMessage("user", "System Boot", bootPrompt);
         await streamChat();
@@ -879,10 +928,7 @@ Behavior:
         const response = await fetch("/setup/state", { method: "GET" });
         if (response.ok) {
           const hardware = await response.json();
-          messages.push({
-            role: "system",
-            content: "Here is the exact hardware state of this machine. You must only report hardware facts from this data and nothing else. Never invent GPU names, RAM amounts, or any hardware details not present here: " + JSON.stringify(hardware)
-          });
+          messages.push({ role: "system", content: prismStateMessage(hardware) });
         }
       } catch (_error) {
         // Normal mode must still work when the setup backend is absent.
