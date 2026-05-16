@@ -9,6 +9,7 @@ NET_ROOT="$PROJECT_ROOT/net"
 install -d \
   "$ROOTFS/usr/local/sbin" \
   "$ROOTFS/usr/local/bin" \
+  "$ROOTFS/usr/local/lib/prism/setup-jobs" \
   "$ROOTFS/usr/local/share/prism" \
   "$ROOTFS/var/www/prism-setup" \
   "$ROOTFS/var/www/prism-chat" \
@@ -38,6 +39,9 @@ install -m 0644 \
 install -m 0644 \
   "$NET_ROOT/iris/setup-prompt.txt" \
   "$ROOTFS/usr/local/share/prism/setup-prompt.txt"
+install -m 0755 \
+  "$NET_ROOT/setup-jobs/"*.sh \
+  "$ROOTFS/usr/local/lib/prism/setup-jobs/"
 install -m 0644 \
   "$NET_ROOT/motd/10-prism" \
   "$ROOTFS/etc/motd"

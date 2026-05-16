@@ -863,6 +863,27 @@ Behavior:
       ].some((phrase) => normalized.includes(phrase));
     }
 
+    function isInstallReadinessQuestion(text) {
+      const normalized = String(text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      return [
+        "are we ready to install services",
+        "ready to install services",
+        "can we install adguard",
+        "can we install adguard home",
+        "is adguard ready to install",
+        "is adguard home ready to install",
+        "is vaultwarden ready to install",
+        "can we install vaultwarden",
+        "is searxng ready to install",
+        "can we install searxng",
+        "check install readiness",
+        "install readiness",
+        "are installs ready",
+        "are we ready to install prism services",
+        "are we ready to install adguard"
+      ].some((phrase) => normalized.includes(phrase));
+    }
+
     function sanitizeBackendResultForIris(value, key) {
       const normalizedKey = String(key || "").toLowerCase();
       const macPattern = /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/i;
@@ -927,6 +948,32 @@ Behavior:
       ].join("\n");
     }
 
+    function prismInstallReadinessMessage(result) {
+      const sanitizedResult = sanitizeBackendResultForIris(result || {}, "");
+      return [
+        "PRISM_BACKEND_RESULT below is the only source of truth for this install-readiness check.",
+        "Report only what the backend returned.",
+        "Do not claim an install happened.",
+        "Do not claim you ran commands personally.",
+        "Do not invent services, files, logs, ports, job results, or command output.",
+        "Say: \"Here is what the PRISM backend reported:\"",
+        "If an install appears possible, say it is a readiness result only and ask what the user wants to do next.",
+        "If asked where this came from, say: \"From the PRISM backend check-install-readiness endpoint.\"",
+        "Summarize the result in concise human-readable bullets. Do not paste raw JSON unless the user asks for raw JSON.",
+        "Here is what the PRISM backend reported:",
+        JSON.stringify(sanitizedResult)
+      ].join("\n");
+    }
+
+    function prismInstallReadinessUnavailableMessage(message) {
+      return [
+        "The PRISM backend install-readiness check failed or was unavailable.",
+        "Do not guess readiness.",
+        "Tell the user the readiness check failed or was unavailable and provide the HTTP/status error if available.",
+        "Readiness check error: " + (message || "unknown error")
+      ].join("\n");
+    }
+
     async function buildPrismStatusContext() {
       try {
         const response = await fetch("/setup/check-prism-status", { method: "POST" });
@@ -937,6 +984,19 @@ Behavior:
         return prismBackendStatusMessage(result);
       } catch (error) {
         return prismBackendStatusUnavailableMessage(error.message);
+      }
+    }
+
+    async function buildInstallReadinessContext() {
+      try {
+        const response = await fetch("/setup/check-install-readiness", { method: "POST" });
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+        const result = await response.json();
+        return prismInstallReadinessMessage(result);
+      } catch (error) {
+        return prismInstallReadinessUnavailableMessage(error.message);
       }
     }
 
@@ -1109,7 +1169,9 @@ Behavior:
       chatInput.value = "";
       sendButton.disabled = true;
       addMessage("user", "You", text);
-      if (isPrismStatusQuestion(text)) {
+      if (isInstallReadinessQuestion(text)) {
+        messages.push({ role: "system", content: await buildInstallReadinessContext() });
+      } else if (isPrismStatusQuestion(text)) {
         messages.push({ role: "system", content: await buildPrismStatusContext() });
       }
       messages.push({ role: "user", content: text });

@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
 import uuid
@@ -33,6 +34,7 @@ SETUP_STATE_FILE = STATE_DIR / "setup-state.json"
 JOB_DIR = STATE_DIR / "jobs"
 JOB_LOG_DIR = Path(os.environ.get("PRISM_JOB_LOG_DIR", "/var/log/prism-jobs"))
 SCRIPT_DIR = Path(os.environ.get("PRISM_SETUP_JOB_SCRIPT_DIR", "/usr/local/lib/prism/setup-jobs"))
+CHECK_INSTALL_READINESS_SCRIPT = SCRIPT_DIR / "check_install_readiness.sh"
 
 DEFAULT_MODEL = "llama3.2:1b"
 MODEL_ALLOWLIST = {"llama3.2:1b", "llama3.2:3b", "llama3.1:8b"}
@@ -94,9 +96,9 @@ def read_text(path: Path) -> str:
         return ""
 
 
-def run_capture(command: list[str], timeout: int = 20) -> subprocess.CompletedProcess[str]:
+def run_capture(command: list[str], timeout: int = 20, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     try:
-        return subprocess.run(command, capture_output=True, text=True, check=False, timeout=timeout)
+        return subprocess.run(command, capture_output=True, text=True, check=False, timeout=timeout, env=env)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return subprocess.CompletedProcess(command, 127, "", str(exc))
 
@@ -486,6 +488,63 @@ def run_public_check_prism_status(timeout_seconds: float = 20.0) -> dict[str, An
     )
 
 
+def run_public_check_install_readiness(timeout_seconds: int = 30) -> dict[str, Any]:
+    if not CHECK_INSTALL_READINESS_SCRIPT.exists() or not os.access(CHECK_INSTALL_READINESS_SCRIPT, os.X_OK):
+        return {
+            "endpoint": "check-install-readiness",
+            "job_name": "check_install_readiness",
+            "status": "failed",
+            "read_only": True,
+            "changed_files": [],
+            "changed_services": [],
+            "overall": "blocked",
+            "summary": "Install readiness check script is unavailable.",
+            "checks": {},
+            "service_readiness": {
+                "adguard": {"status": "unknown", "reasons": ["readiness check script is unavailable"]},
+                "vaultwarden": {"status": "unknown", "reasons": ["readiness check script is unavailable"]},
+                "searxng": {"status": "unknown", "reasons": ["readiness check script is unavailable"]},
+            },
+            "next_step": "No install was performed. Restore the read-only readiness check before continuing.",
+            "rollback_hint": "No changes made; read-only check.",
+        }
+
+    with tempfile.TemporaryDirectory(prefix="prism-install-readiness-") as tmpdir:
+        result_path = Path(tmpdir) / "result.json"
+        env = os.environ.copy()
+        env["PRISM_JOB_RESULT"] = str(result_path)
+        process = run_capture([str(CHECK_INSTALL_READINESS_SCRIPT)], timeout=timeout_seconds, env=env)
+        if process.returncode == 0:
+            try:
+                result = json.loads(result_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                result = None
+            if isinstance(result, dict):
+                return sanitize_public_state(result)
+
+        return sanitize_public_state(
+            {
+                "endpoint": "check-install-readiness",
+                "job_name": "check_install_readiness",
+                "status": "failed",
+                "read_only": True,
+                "changed_files": [],
+                "changed_services": [],
+                "overall": "blocked",
+                "summary": "Install readiness check failed or did not return structured JSON.",
+                "checks": {},
+                "service_readiness": {
+                    "adguard": {"status": "unknown", "reasons": ["readiness check failed"]},
+                    "vaultwarden": {"status": "unknown", "reasons": ["readiness check failed"]},
+                    "searxng": {"status": "unknown", "reasons": ["readiness check failed"]},
+                },
+                "error": process.stderr.strip() or process.stdout.strip() or f"exit {process.returncode}",
+                "next_step": "No install was performed. Iris should report that readiness is unavailable.",
+                "rollback_hint": "No changes made; read-only check.",
+            }
+        )
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "PrismSetupBackend/0.2"
 
@@ -538,6 +597,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/setup/check-prism-status":
             self._json(run_public_check_prism_status())
+            return
+
+        if path == "/setup/check-install-readiness":
+            self._json(run_public_check_install_readiness())
             return
 
         for prefix in ("/jobs/", "/setup/jobs/"):
