@@ -846,6 +846,100 @@ Behavior:
       ].join("\n");
     }
 
+    function isPrismStatusQuestion(text) {
+      const normalized = String(text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      return [
+        "check prism status",
+        "check server status",
+        "check system status",
+        "what is prism status",
+        "what is the prism status",
+        "is prism healthy",
+        "is the server healthy",
+        "status check",
+        "prism health",
+        "server health",
+        "system health"
+      ].some((phrase) => normalized.includes(phrase));
+    }
+
+    function sanitizeBackendResultForIris(value, key) {
+      const normalizedKey = String(key || "").toLowerCase();
+      const macPattern = /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/i;
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const apiKeyPattern = /^(sk|pk|ghp|github_pat|xox[baprs])-?[a-z0-9_\-]{16,}$/i;
+      const sensitiveNames = new Set(["serial", "mac", "mac_address", "wwn", "uuid", "by_id", "password", "passwd", "token", "cookie", "private_key", "api_key"]);
+
+      if (value === null || value === undefined) {
+        return value;
+      }
+      if (Array.isArray(value)) {
+        return value.map((item) => sanitizeBackendResultForIris(item, ""));
+      }
+      if (typeof value === "object") {
+        const copy = {};
+        Object.entries(value).forEach(([childKey, childValue]) => {
+          copy[childKey] = sanitizeBackendResultForIris(childValue, childKey);
+        });
+        return copy;
+      }
+      if (typeof value !== "string") {
+        return value;
+      }
+
+      if (sensitiveNames.has(normalizedKey)) {
+        return "[REDACTED]";
+      }
+      if (normalizedKey === "address" && macPattern.test(value)) {
+        return "[REDACTED]";
+      }
+      if (normalizedKey === "id" && (uuidPattern.test(value) || value.length >= 16 || value.startsWith("0x"))) {
+        return "[REDACTED]";
+      }
+      if (value.includes("/dev/disk/by-id") || uuidPattern.test(value) || macPattern.test(value) || apiKeyPattern.test(value) || value.includes("-----BEGIN ")) {
+        return "[REDACTED]";
+      }
+      return value;
+    }
+
+    function prismBackendStatusMessage(result) {
+      const sanitizedResult = sanitizeBackendResultForIris(result || {}, "");
+      return [
+        "PRISM_BACKEND_RESULT below is the only source of truth for this status check.",
+        "Report only what the backend returned.",
+        "Do not claim you personally ran commands.",
+        "Do not invent services, files, logs, ports, hardware, job results, or command output.",
+        "If asked where this came from, say: \"From the PRISM backend check-prism-status endpoint.\"",
+        "Begin your answer with: \"Here is what the PRISM backend reported:\"",
+        "Summarize the result in concise human-readable bullets. Do not paste raw JSON unless the user asks for raw JSON.",
+        "Do not label port numbers with service names unless the backend result explicitly includes those service names.",
+        "Here is what the PRISM backend reported:",
+        JSON.stringify(sanitizedResult)
+      ].join("\n");
+    }
+
+    function prismBackendStatusUnavailableMessage(message) {
+      return [
+        "The PRISM backend status check failed or was unavailable.",
+        "Do not invent status.",
+        "Tell the user the status check failed and provide the HTTP/status error if available.",
+        "Status check error: " + (message || "unknown error")
+      ].join("\n");
+    }
+
+    async function buildPrismStatusContext() {
+      try {
+        const response = await fetch("/setup/check-prism-status", { method: "POST" });
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+        const result = await response.json();
+        return prismBackendStatusMessage(result);
+      } catch (error) {
+        return prismBackendStatusUnavailableMessage(error.message);
+      }
+    }
+
     function normalizeHardwareState(hardware) {
       const totalRamMb = hardware.total_ram_mb || hardware.ram_mb || 0;
       const nics = Array.isArray(hardware.nics) ? hardware.nics : [];
@@ -1015,6 +1109,9 @@ Behavior:
       chatInput.value = "";
       sendButton.disabled = true;
       addMessage("user", "You", text);
+      if (isPrismStatusQuestion(text)) {
+        messages.push({ role: "system", content: await buildPrismStatusContext() });
+      }
       messages.push({ role: "user", content: text });
 
       try {
