@@ -430,6 +430,62 @@ def start_job(job_name: str, payload: dict[str, Any]) -> dict[str, Any]:
     return job_receipt(metadata)
 
 
+def run_public_check_prism_status(timeout_seconds: float = 20.0) -> dict[str, Any]:
+    receipt = start_job("check_prism_status", {})
+    job_id = str(receipt["job_id"])
+    deadline = time.time() + timeout_seconds
+    metadata = load_job(job_id)
+
+    while time.time() < deadline:
+        metadata = load_job(job_id)
+        if metadata and metadata.get("status") in {"succeeded", "failed"}:
+            break
+        time.sleep(0.25)
+
+    if metadata is None:
+        return {
+            "job_name": "check_prism_status",
+            "status": "failed",
+            "read_only": True,
+            "summary": "Backend could not load check_prism_status job metadata.",
+            "changed_files": [],
+            "changed_services": [],
+            "rollback_hint": "No changes made; read-only job.",
+        }
+
+    receipt = job_receipt(metadata)
+    result = receipt.get("result")
+    if isinstance(result, dict):
+        result["backend_job"] = {
+            "job_id": receipt["job_id"],
+            "status": receipt["status"],
+            "started_at": receipt.get("started_at"),
+            "finished_at": receipt.get("finished_at"),
+            "exit_code": receipt.get("exit_code"),
+        }
+        return sanitize_public_state(result)
+
+    return sanitize_public_state(
+        {
+            "job_name": "check_prism_status",
+            "status": receipt["status"],
+            "read_only": True,
+            "summary": "check_prism_status did not return a structured result before the timeout.",
+            "backend_job": {
+                "job_id": receipt["job_id"],
+                "status": receipt["status"],
+                "started_at": receipt.get("started_at"),
+                "finished_at": receipt.get("finished_at"),
+                "exit_code": receipt.get("exit_code"),
+                "error": receipt.get("error"),
+            },
+            "changed_files": [],
+            "changed_services": [],
+            "rollback_hint": "No changes made; read-only job.",
+        }
+    )
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "PrismSetupBackend/0.2"
 
@@ -479,6 +535,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path.rstrip("/") or "/"
         payload = self._read_json()
+
+        if path == "/setup/check-prism-status":
+            self._json(run_public_check_prism_status())
+            return
 
         for prefix in ("/jobs/", "/setup/jobs/"):
             if path.startswith(prefix):
