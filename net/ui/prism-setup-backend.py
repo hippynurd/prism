@@ -46,6 +46,10 @@ SENSITIVE_KEY_RE = re.compile(
 
 
 ALLOWED_JOBS: dict[str, dict[str, str]] = {
+    "check_prism_status": {
+        "script": "check_prism_status.sh",
+        "description": "Return a read-only sanitized PRISM status snapshot.",
+    },
     "probe_hardware": {
         "script": "probe_hardware.sh",
         "description": "Refresh PRISM setup hardware and runtime state.",
@@ -268,7 +272,8 @@ def sanitize_public_state(value: Any, key: str = "") -> Any:
     if isinstance(value, dict):
         sanitized: dict[str, Any] = {}
         for item_key, item_value in value.items():
-            if SENSITIVE_KEY_RE.search(item_key) or should_redact_value(item_key, item_value):
+            sensitive_key = SENSITIVE_KEY_RE.search(item_key) and not isinstance(item_value, (bool, dict, list))
+            if sensitive_key or should_redact_value(item_key, item_value):
                 sanitized[item_key] = REDACTED
             else:
                 sanitized[item_key] = sanitize_public_state(item_value, item_key)
@@ -300,6 +305,10 @@ def job_metadata_path(job_id: str) -> Path:
     return JOB_DIR / f"{job_id}.json"
 
 
+def job_result_path(job_id: str) -> Path:
+    return JOB_DIR / f"{job_id}.result.json"
+
+
 def load_job(job_id: str) -> dict[str, Any] | None:
     path = job_metadata_path(job_id)
     if not path.exists():
@@ -318,7 +327,7 @@ def write_job(metadata: dict[str, Any]) -> None:
 
 
 def job_receipt(metadata: dict[str, Any]) -> dict[str, Any]:
-    return {
+    receipt = {
         "job_id": metadata["job_id"],
         "job_name": metadata["job_name"],
         "status": metadata["status"],
@@ -330,6 +339,14 @@ def job_receipt(metadata: dict[str, Any]) -> dict[str, Any]:
         "metadata_path": str(job_metadata_path(metadata["job_id"])),
         "error": metadata.get("error"),
     }
+    result_path = Path(str(metadata.get("result_path") or ""))
+    if result_path.exists():
+        try:
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+            receipt["result"] = sanitize_public_state(result)
+        except json.JSONDecodeError:
+            receipt["result_error"] = "job result is not valid JSON"
+    return receipt
 
 
 def validate_job_payload(job_name: str, payload: dict[str, Any]) -> dict[str, str]:
@@ -357,6 +374,7 @@ def run_job(job_id: str, env_overrides: dict[str, str]) -> None:
     env["PRISM_JOB_ID"] = job_id
     env["PRISM_JOB_NAME"] = metadata["job_name"]
     env["PRISM_JOB_LOG"] = metadata["log_path"]
+    env["PRISM_JOB_RESULT"] = metadata["result_path"]
     env["PRISM_STATE_FILE"] = str(SETUP_STATE_FILE)
     env["PRISM_SETUP_COMPLETE_FILE"] = str(SETUP_COMPLETE_FILE)
 
@@ -380,7 +398,7 @@ def run_job(job_id: str, env_overrides: dict[str, str]) -> None:
         if exit_code != 0:
             metadata["error"] = f"{metadata['job_name']} exited {exit_code}"
         write_job(metadata)
-        if exit_code == 0:
+        if exit_code == 0 and metadata["job_name"] != "check_prism_status":
             collect_state()
         log.write(f"[{now_iso()}] finished {metadata['job_name']} exit_code={exit_code}\n".encode("utf-8"))
 
@@ -402,6 +420,7 @@ def start_job(job_name: str, payload: dict[str, Any]) -> dict[str, Any]:
         "finished_at": None,
         "exit_code": None,
         "log_path": str(JOB_LOG_DIR / f"{job_id}-{job_name}.log"),
+        "result_path": str(job_result_path(job_id)),
         "request": {k: v for k, v in payload.items() if k in {"model"}},
     }
     write_job(metadata)
