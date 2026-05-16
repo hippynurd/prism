@@ -884,6 +884,45 @@ Behavior:
       ].some((phrase) => normalized.includes(phrase));
     }
 
+    function isBlockerDiagnosisQuestion(text) {
+      const normalized = String(text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      return [
+        "why is adguard blocked",
+        "why is vaultwarden blocked",
+        "why is searxng blocked",
+        "diagnose install blockers",
+        "what is blocking installs",
+        "what is blocking adguard",
+        "what is blocking vaultwarden",
+        "what is blocking searxng",
+        "why can t we install adguard",
+        "why cant we install adguard",
+        "why can t we install vaultwarden",
+        "why cant we install vaultwarden",
+        "why can t we install searxng",
+        "why cant we install searxng",
+        "what is using port 53",
+        "what is on port 53",
+        "what is using port 80",
+        "what is using port 443",
+        "blocker diagnosis"
+      ].some((phrase) => normalized.includes(phrase));
+    }
+
+    function inferBlockerDiagnosisService(text) {
+      const normalized = String(text || "").toLowerCase();
+      if (normalized.includes("adguard") || normalized.includes("port 53") || normalized.includes("dns")) {
+        return "adguard";
+      }
+      if (normalized.includes("vaultwarden")) {
+        return "vaultwarden";
+      }
+      if (normalized.includes("searxng")) {
+        return "searxng";
+      }
+      return "all";
+    }
+
     function sanitizeBackendResultForIris(value, key) {
       const normalizedKey = String(key || "").toLowerCase();
       const macPattern = /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/i;
@@ -974,6 +1013,32 @@ Behavior:
       ].join("\n");
     }
 
+    function prismBlockerDiagnosisMessage(result) {
+      const sanitizedResult = sanitizeBackendResultForIris(result || {}, "");
+      return [
+        "PRISM_BACKEND_RESULT below is the only source of truth for this blocker diagnosis.",
+        "Report only what the backend returned.",
+        "Do not claim you personally ran commands.",
+        "Do not claim you changed services.",
+        "Do not invent services, files, logs, ports, job results, or command output.",
+        "Say: \"Here is what the PRISM backend reported:\"",
+        "If options are listed, explain them as options only. Do not perform them.",
+        "If asked where this came from, say: \"From the PRISM backend diagnose-install-blockers endpoint.\"",
+        "Summarize the result in concise human-readable bullets. Do not paste raw JSON unless the user asks for raw JSON.",
+        "Here is what the PRISM backend reported:",
+        JSON.stringify(sanitizedResult)
+      ].join("\n");
+    }
+
+    function prismBlockerDiagnosisUnavailableMessage(message) {
+      return [
+        "The PRISM backend blocker diagnosis failed or was unavailable.",
+        "Do not guess the blocker.",
+        "Tell the user the diagnosis failed or was unavailable and provide the HTTP/status error if available.",
+        "Blocker diagnosis error: " + (message || "unknown error")
+      ].join("\n");
+    }
+
     async function buildPrismStatusContext() {
       try {
         const response = await fetch("/setup/check-prism-status", { method: "POST" });
@@ -997,6 +1062,27 @@ Behavior:
         return prismInstallReadinessMessage(result);
       } catch (error) {
         return prismInstallReadinessUnavailableMessage(error.message);
+      }
+    }
+
+    async function buildBlockerDiagnosisContext(text) {
+      try {
+        const service = inferBlockerDiagnosisService(text);
+        const options = {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        };
+        if (service !== "all") {
+          options.body = JSON.stringify({ service });
+        }
+        const response = await fetch("/setup/diagnose-install-blockers", options);
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+        const result = await response.json();
+        return prismBlockerDiagnosisMessage(result);
+      } catch (error) {
+        return prismBlockerDiagnosisUnavailableMessage(error.message);
       }
     }
 
@@ -1169,7 +1255,9 @@ Behavior:
       chatInput.value = "";
       sendButton.disabled = true;
       addMessage("user", "You", text);
-      if (isInstallReadinessQuestion(text)) {
+      if (isBlockerDiagnosisQuestion(text)) {
+        messages.push({ role: "system", content: await buildBlockerDiagnosisContext(text) });
+      } else if (isInstallReadinessQuestion(text)) {
         messages.push({ role: "system", content: await buildInstallReadinessContext() });
       } else if (isPrismStatusQuestion(text)) {
         messages.push({ role: "system", content: await buildPrismStatusContext() });

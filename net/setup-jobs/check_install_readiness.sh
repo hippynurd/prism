@@ -55,10 +55,11 @@ def sanitize(value: Any, key: str = "") -> Any:
     if isinstance(value, dict):
         cleaned: dict[str, Any] = {}
         for item_key, item_value in value.items():
-            if SENSITIVE_KEY_RE.search(item_key) and not isinstance(item_value, (bool, dict, list)):
+            item_key_text = str(item_key)
+            if SENSITIVE_KEY_RE.search(item_key_text) and not isinstance(item_value, (bool, dict, list)):
                 cleaned[item_key] = REDACTED
             else:
-                cleaned[item_key] = sanitize(item_value, item_key)
+                cleaned[item_key] = sanitize(item_value, item_key_text)
         return cleaned
     if isinstance(value, list):
         return [sanitize(item, key) for item in value]

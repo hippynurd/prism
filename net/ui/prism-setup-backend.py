@@ -35,6 +35,7 @@ JOB_DIR = STATE_DIR / "jobs"
 JOB_LOG_DIR = Path(os.environ.get("PRISM_JOB_LOG_DIR", "/var/log/prism-jobs"))
 SCRIPT_DIR = Path(os.environ.get("PRISM_SETUP_JOB_SCRIPT_DIR", "/usr/local/lib/prism/setup-jobs"))
 CHECK_INSTALL_READINESS_SCRIPT = SCRIPT_DIR / "check_install_readiness.sh"
+DIAGNOSE_INSTALL_BLOCKERS_SCRIPT = SCRIPT_DIR / "diagnose_install_blockers.sh"
 
 DEFAULT_MODEL = "llama3.2:1b"
 MODEL_ALLOWLIST = {"llama3.2:1b", "llama3.2:3b", "llama3.1:8b"}
@@ -545,6 +546,62 @@ def run_public_check_install_readiness(timeout_seconds: int = 30) -> dict[str, A
         )
 
 
+def run_public_diagnose_install_blockers(payload: dict[str, Any] | None = None, timeout_seconds: int = 30) -> dict[str, Any]:
+    payload = payload or {}
+    service = str(payload.get("service") or "all").strip().lower()
+    if service not in {"adguard", "vaultwarden", "searxng", "all"}:
+        service = "all"
+
+    if not DIAGNOSE_INSTALL_BLOCKERS_SCRIPT.exists() or not os.access(DIAGNOSE_INSTALL_BLOCKERS_SCRIPT, os.X_OK):
+        return {
+            "endpoint": "diagnose-install-blockers",
+            "job_name": "diagnose_install_blockers",
+            "status": "failed",
+            "read_only": True,
+            "changed_files": [],
+            "changed_services": [],
+            "service": service,
+            "overall": "unknown",
+            "summary": "Blocker diagnosis script is unavailable.",
+            "blockers": [],
+            "safe_next_steps": ["Restore the read-only blocker diagnosis script before continuing."],
+            "checks": {},
+            "rollback_hint": "No changes made; read-only diagnosis.",
+        }
+
+    with tempfile.TemporaryDirectory(prefix="prism-blocker-diagnosis-") as tmpdir:
+        result_path = Path(tmpdir) / "result.json"
+        env = os.environ.copy()
+        env["PRISM_JOB_RESULT"] = str(result_path)
+        env["PRISM_BLOCKER_SERVICE"] = service
+        process = run_capture([str(DIAGNOSE_INSTALL_BLOCKERS_SCRIPT)], timeout=timeout_seconds, env=env)
+        if process.returncode == 0:
+            try:
+                result = json.loads(result_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                result = None
+            if isinstance(result, dict):
+                return sanitize_public_state(result)
+
+        return sanitize_public_state(
+            {
+                "endpoint": "diagnose-install-blockers",
+                "job_name": "diagnose_install_blockers",
+                "status": "failed",
+                "read_only": True,
+                "changed_files": [],
+                "changed_services": [],
+                "service": service,
+                "overall": "unknown",
+                "summary": "Blocker diagnosis failed or did not return structured JSON.",
+                "blockers": [],
+                "safe_next_steps": ["Tell the user the blocker diagnosis failed or was unavailable."],
+                "error": process.stderr.strip() or process.stdout.strip() or f"exit {process.returncode}",
+                "rollback_hint": "No changes made; read-only diagnosis.",
+            }
+        )
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "PrismSetupBackend/0.2"
 
@@ -601,6 +658,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/setup/check-install-readiness":
             self._json(run_public_check_install_readiness())
+            return
+
+        if path == "/setup/diagnose-install-blockers":
+            self._json(run_public_diagnose_install_blockers(payload))
             return
 
         for prefix in ("/jobs/", "/setup/jobs/"):
