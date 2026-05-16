@@ -36,6 +36,7 @@ JOB_LOG_DIR = Path(os.environ.get("PRISM_JOB_LOG_DIR", "/var/log/prism-jobs"))
 SCRIPT_DIR = Path(os.environ.get("PRISM_SETUP_JOB_SCRIPT_DIR", "/usr/local/lib/prism/setup-jobs"))
 CHECK_INSTALL_READINESS_SCRIPT = SCRIPT_DIR / "check_install_readiness.sh"
 DIAGNOSE_INSTALL_BLOCKERS_SCRIPT = SCRIPT_DIR / "diagnose_install_blockers.sh"
+CHECK_AI_RUNNER_READINESS_SCRIPT = SCRIPT_DIR / "check_ai_runner_readiness.sh"
 
 DEFAULT_MODEL = "llama3.2:1b"
 MODEL_ALLOWLIST = {"llama3.2:1b", "llama3.2:3b", "llama3.1:8b"}
@@ -602,6 +603,73 @@ def run_public_diagnose_install_blockers(payload: dict[str, Any] | None = None, 
         )
 
 
+def run_public_check_ai_runner_readiness(timeout_seconds: int = 30) -> dict[str, Any]:
+    if not CHECK_AI_RUNNER_READINESS_SCRIPT.exists() or not os.access(CHECK_AI_RUNNER_READINESS_SCRIPT, os.X_OK):
+        return {
+            "endpoint": "check-ai-runner-readiness",
+            "job_name": "check_ai_runner_readiness",
+            "status": "failed",
+            "read_only": True,
+            "changed_files": [],
+            "changed_services": [],
+            "overall": "unknown",
+            "summary": "AI runner readiness script is unavailable.",
+            "gpu_devices": [],
+            "model_runtime": {"ollama_active": False, "installed_models": [], "recommended_model": "unknown"},
+            "assignments": {
+                "iris_gpu": "unknown",
+                "agent_gpu": "unknown",
+                "assignment_verified": False,
+                "iris_gpu_config_path": "/etc/prism/iris-gpu",
+                "agent_gpu_config_path": "/etc/prism/agent-gpu",
+            },
+            "recommended_roles": ["local Iris assistant", "helper LLM", "coding/log/script runner"],
+            "warnings": ["AI runner readiness script is unavailable."],
+            "safe_next_steps": ["Restore the read-only AI runner readiness script before continuing."],
+            "rollback_hint": "No changes made; read-only check.",
+        }
+
+    with tempfile.TemporaryDirectory(prefix="prism-ai-runner-readiness-") as tmpdir:
+        result_path = Path(tmpdir) / "result.json"
+        env = os.environ.copy()
+        env["PRISM_JOB_RESULT"] = str(result_path)
+        process = run_capture([str(CHECK_AI_RUNNER_READINESS_SCRIPT)], timeout=timeout_seconds, env=env)
+        if process.returncode == 0:
+            try:
+                result = json.loads(result_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                result = None
+            if isinstance(result, dict):
+                return sanitize_public_state(result)
+
+        return sanitize_public_state(
+            {
+                "endpoint": "check-ai-runner-readiness",
+                "job_name": "check_ai_runner_readiness",
+                "status": "failed",
+                "read_only": True,
+                "changed_files": [],
+                "changed_services": [],
+                "overall": "unknown",
+                "summary": "AI runner readiness check failed or did not return structured JSON.",
+                "gpu_devices": [],
+                "model_runtime": {"ollama_active": False, "installed_models": [], "recommended_model": "unknown"},
+                "assignments": {
+                    "iris_gpu": "unknown",
+                    "agent_gpu": "unknown",
+                    "assignment_verified": False,
+                    "iris_gpu_config_path": "/etc/prism/iris-gpu",
+                    "agent_gpu_config_path": "/etc/prism/agent-gpu",
+                },
+                "recommended_roles": ["local Iris assistant", "helper LLM", "coding/log/script runner"],
+                "warnings": ["AI runner readiness check failed."],
+                "safe_next_steps": ["Tell the user the AI runner readiness check failed or was unavailable."],
+                "error": process.stderr.strip() or process.stdout.strip() or f"exit {process.returncode}",
+                "rollback_hint": "No changes made; read-only check.",
+            }
+        )
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "PrismSetupBackend/0.2"
 
@@ -662,6 +730,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/setup/diagnose-install-blockers":
             self._json(run_public_diagnose_install_blockers(payload))
+            return
+
+        if path == "/setup/check-ai-runner-readiness":
+            self._json(run_public_check_ai_runner_readiness())
             return
 
         for prefix in ("/jobs/", "/setup/jobs/"):

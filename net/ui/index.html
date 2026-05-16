@@ -909,6 +909,26 @@ Behavior:
       ].some((phrase) => normalized.includes(phrase));
     }
 
+    function isAIRunnerReadinessQuestion(text) {
+      const normalized = String(text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      return [
+        "can this machine use the gpus for local ai helpers",
+        "can this machine run local ai helpers",
+        "check ai runner readiness",
+        "can we use the gpu for ai",
+        "which gpu should iris use",
+        "can iris use the second gpu",
+        "can this run helper agents",
+        "can this run local llms",
+        "local ai readiness",
+        "ai runner readiness",
+        "gpu readiness for ai",
+        "can this machine support local ai",
+        "can this machine support local llms",
+        "can this machine support coding agents"
+      ].some((phrase) => normalized.includes(phrase));
+    }
+
     function inferBlockerDiagnosisService(text) {
       const normalized = String(text || "").toLowerCase();
       if (normalized.includes("adguard") || normalized.includes("port 53") || normalized.includes("dns")) {
@@ -1039,6 +1059,34 @@ Behavior:
       ].join("\n");
     }
 
+    function prismAIRunnerReadinessMessage(result) {
+      const sanitizedResult = sanitizeBackendResultForIris(result || {}, "");
+      return [
+        "PRISM_BACKEND_RESULT below is the only source of truth for this AI runner readiness check.",
+        "Report only what the backend returned.",
+        "Do not claim you personally ran commands.",
+        "Do not claim you changed GPU settings.",
+        "Do not claim models were installed, pulled, or run unless the backend reports that.",
+        "Do not invent GPU assignments, services, files, logs, ports, job results, or command output.",
+        "Say: \"Here is what the PRISM backend reported:\"",
+        "Mention image generation only as an optional possible GPU workload, not as an assumed goal.",
+        "If assignments are unknown, say they are unknown.",
+        "If asked where this came from, say: \"From the PRISM backend check-ai-runner-readiness endpoint.\"",
+        "Summarize the result in concise human-readable bullets. Do not paste raw JSON unless the user asks for raw JSON.",
+        "Here is what the PRISM backend reported:",
+        JSON.stringify(sanitizedResult)
+      ].join("\n");
+    }
+
+    function prismAIRunnerReadinessUnavailableMessage(message) {
+      return [
+        "The PRISM backend AI runner readiness check failed or was unavailable.",
+        "Do not guess readiness.",
+        "Tell the user the readiness check failed or was unavailable and provide the HTTP/status error if available.",
+        "AI runner readiness error: " + (message || "unknown error")
+      ].join("\n");
+    }
+
     async function buildPrismStatusContext() {
       try {
         const response = await fetch("/setup/check-prism-status", { method: "POST" });
@@ -1083,6 +1131,19 @@ Behavior:
         return prismBlockerDiagnosisMessage(result);
       } catch (error) {
         return prismBlockerDiagnosisUnavailableMessage(error.message);
+      }
+    }
+
+    async function buildAIRunnerReadinessContext() {
+      try {
+        const response = await fetch("/setup/check-ai-runner-readiness", { method: "POST" });
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+        const result = await response.json();
+        return prismAIRunnerReadinessMessage(result);
+      } catch (error) {
+        return prismAIRunnerReadinessUnavailableMessage(error.message);
       }
     }
 
@@ -1255,7 +1316,9 @@ Behavior:
       chatInput.value = "";
       sendButton.disabled = true;
       addMessage("user", "You", text);
-      if (isBlockerDiagnosisQuestion(text)) {
+      if (isAIRunnerReadinessQuestion(text)) {
+        messages.push({ role: "system", content: await buildAIRunnerReadinessContext() });
+      } else if (isBlockerDiagnosisQuestion(text)) {
         messages.push({ role: "system", content: await buildBlockerDiagnosisContext(text) });
       } else if (isInstallReadinessQuestion(text)) {
         messages.push({ role: "system", content: await buildInstallReadinessContext() });
