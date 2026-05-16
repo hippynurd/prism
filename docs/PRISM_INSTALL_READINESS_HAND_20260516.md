@@ -204,53 +204,108 @@ and `password`; those labels are not secret values.
 
 ## Live Deployment Status
 
-Live deployment was not completed from this shell.
+Live deployment completed on `192.168.14.115`.
 
-Reason:
+Deployed files:
 
-- The current shell is on `MotherShip` (`192.168.14.1`), not PRISM
-  `192.168.14.115`.
-- The expected live files were not present locally:
-  - `/usr/local/bin/prism-setup-backend`
-  - `/usr/local/lib/prism/setup-jobs/check_install_readiness.sh`
-  - `/var/www/prism-chat/index.html`
-  - `/etc/nginx/sites-available/prism-iris`
-- The new public endpoint on `192.168.14.115` returned `404 Not Found` before
-  deployment.
+- `net/ui/prism-setup-backend.py` to `/usr/local/bin/prism-setup-backend`
+- `net/setup-jobs/check_install_readiness.sh` to
+  `/usr/local/lib/prism/setup-jobs/check_install_readiness.sh`
+- `net/ui/index.html` to `/var/www/prism-chat/index.html`
+- `net/nginx/prism-iris.conf` to `/etc/nginx/sites-available/prism-iris`
 
-No live files were edited from this shell. No live backups were created from
-this shell. No service restarts were performed.
-
-Required live backup paths before deployment on `192.168.14.115`:
+Live backups created before replacement:
 
 ```text
 /usr/local/bin/prism-setup-backend.backup-20260516-install-readiness
 /var/www/prism-chat/index.html.backup-20260516-install-readiness
+/etc/nginx/sites-available/prism-iris.backup-20260516-install-readiness
 ```
 
-## Pending Live Verification
+Live validation:
 
-After the repo changes are deployed to `192.168.14.115`, verify:
-
-```sh
-curl -si -X POST http://192.168.14.115/setup/check-install-readiness | head -80
-curl -si http://192.168.14.115/setup/jobs | head -20
-curl -si -X POST http://192.168.14.115/setup/jobs/install_vaultwarden | head -20
-curl -si http://192.168.14.115/setup/state | head -40
-curl -si http://192.168.14.115/hardware | head -20
-curl -si http://192.168.14.115/setup/hardware | head -20
+```text
+python3 -m py_compile /usr/local/bin/prism-setup-backend: passed
+bash -n /usr/local/lib/prism/setup-jobs/check_install_readiness.sh: passed
+nginx -t: passed
+systemctl restart prism-setup-backend: completed
+systemctl is-active prism-setup-backend: active
+systemctl reload nginx: completed
+systemctl is-active nginx: active
 ```
 
-Expected safety results:
+No packages were installed. No PRISM services were installed. No mutating setup
+jobs were triggered. No models were changed. No passwords were changed.
 
-- `/setup/check-install-readiness`: `200 OK`, read-only JSON
-- `/setup/jobs`: `403 Forbidden`
-- `/setup/jobs/install_vaultwarden`: `403 Forbidden`
-- `/setup/state`: `200 OK`, sanitized JSON
-- `/hardware`: `403 Forbidden`
-- `/setup/hardware`: `403 Forbidden`
-- readiness response has `changed_files: []`
-- readiness response has `changed_services: []`
+## Live Verification
+
+Public endpoint checks from MotherShip:
+
+```text
+POST /setup/check-install-readiness: 200 OK
+GET /setup/jobs: 403 Forbidden
+POST /setup/jobs/install_vaultwarden: 403 Forbidden
+GET /setup/state: 200 OK, sanitized JSON
+GET /hardware: 403 Forbidden
+GET /setup/hardware: 403 Forbidden
+```
+
+Readiness result:
+
+```text
+endpoint: check-install-readiness
+read_only: true
+overall: warning
+changed_files: []
+changed_services: []
+adguard status: blocked
+vaultwarden status: ready
+searxng status: ready
+```
+
+AdGuard is blocked by the readiness check because port `53` is already in use.
+No install was performed.
+
+Live privacy check against the readiness response:
+
+```text
+raw MAC addresses present? false
+disk serial values present? false
+WWN values present? false
+UUID-like hardware ID values present? false
+/dev/disk/by-id paths present? false
+password/token/cookie/private key values present? false
+useful readiness info present? true
+```
+
+Live frontend check:
+
+```text
+The served Iris UI includes isInstallReadinessQuestion, calls
+POST /setup/check-install-readiness, and injects the required
+"Here is what the PRISM backend reported:" instruction.
+```
+
+Iris-style live API test with the user question `Are we ready to install
+AdGuard?`:
+
+```text
+Iris began with "Here is what the PRISM backend reported:"
+Iris reported readiness only.
+Iris did not claim AdGuard was installed.
+Iris did not trigger an install job.
+Iris reported AdGuard blocked because port 53 is in use.
+```
+
+Service-install confirmation:
+
+```text
+adguard units/processes: 0
+AdGuardHome units/processes: 0
+vaultwarden units/processes: 0
+searxng units/processes: 0
+recent install job records in the last 20 minutes: 0
+```
 
 ## Next Step Toward Iris-Managed Installs
 
