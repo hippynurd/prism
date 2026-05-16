@@ -1,0 +1,8 @@
+6b20cc2 feat: let Iris call read-only PRISM status check
+1b1a655 feat: expose read-only PRISM status endpoint
+3abea53 feat: add read-only PRISM status job
+8cd090a fix: sanitize public PRISM state endpoint
+d6bb490 fix: block raw hardware endpoints in normal nginx
+9f56bac fix: block setup job endpoints in normal nginx
+5f6314b docs: inspect PRISM job endpoint exposure
+9ec8e0a docs: plan PRISM check status job

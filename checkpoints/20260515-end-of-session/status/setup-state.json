@@ -1,0 +1,79 @@
+{
+  "allowed_jobs": [
+    {
+      "description": "Return a read-only sanitized PRISM status snapshot.",
+      "name": "check_prism_status"
+    },
+    {
+      "description": "Refresh PRISM setup hardware and runtime state.",
+      "name": "probe_hardware"
+    },
+    {
+      "description": "Pull an allowed Ollama model for Iris.",
+      "name": "install_model"
+    },
+    {
+      "description": "Install Debian NVIDIA runtime packages when supported.",
+      "name": "install_nvidia_runtime"
+    },
+    {
+      "description": "Verify NVIDIA runtime and restart Ollama for GPU use.",
+      "name": "enable_gpu_for_iris"
+    },
+    {
+      "description": "Validate and reload nginx.",
+      "name": "reload_nginx"
+    },
+    {
+      "description": "Install and verify Vaultwarden.",
+      "name": "install_vaultwarden"
+    },
+    {
+      "description": "Write the setup completion marker for firstboot handoff.",
+      "name": "mark_setup_complete"
+    }
+  ],
+  "extra_disks": [
+    {
+      "model": "HGST HDN724030ALE640",
+      "name": "sda",
+      "path": "/dev/sda",
+      "serial": "[REDACTED]",
+      "size": "2.7T"
+    }
+  ],
+  "gpu_devices": [
+    {
+      "description": "03:00.0 \"VGA compatible controller\" \"NVIDIA Corporation\" \"GM200 [GeForce GTX 980 Ti]\" -ra1 -p00 \"ASUSTeK Computer Inc.\" \"GM200 [GeForce GTX 980 Ti]\"",
+      "source": "lspci"
+    },
+    {
+      "description": "04:00.0 \"VGA compatible controller\" \"NVIDIA Corporation\" \"GP107 [GeForce GTX 1050 Ti]\" -ra1 -p00 \"Micro-Star International Co., Ltd. [MSI]\" \"GP107 [GeForce GTX 1050 Ti]\"",
+      "source": "lspci"
+    }
+  ],
+  "gpu_driver": "nvidia",
+  "gpu_present": true,
+  "gpu_usable": true,
+  "last_probe_timestamp": "2026-05-15T22:15:04-0700",
+  "nic_count": 2,
+  "nics": [
+    {
+      "carrier": true,
+      "mac": "[REDACTED]",
+      "name": "eno1",
+      "operstate": "up"
+    },
+    {
+      "carrier": false,
+      "mac": "[REDACTED]",
+      "name": "enp11s0",
+      "operstate": "down"
+    }
+  ],
+  "ollama_gpu_ready": true,
+  "ollama_model_installed": true,
+  "recommended_model": "llama3.1:8b",
+  "setup_complete": true,
+  "total_ram_mb": 64139
+}

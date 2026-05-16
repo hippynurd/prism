@@ -1,0 +1,66 @@
+# PRISM normal-mode nginx configuration.
+# Why this exists:
+# - After first boot, PRISM should stop exposing setup routes and return to the
+#   normal Iris assistant experience.
+# - Firstboot switches nginx from prism-setup.conf to this file once setup ends.
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    server_name _;
+    root /var/www/prism-chat;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:11434/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600;
+        proxy_connect_timeout 600;
+        proxy_send_timeout 600;
+    }
+
+    location ^~ /setup/jobs {
+        return 403;
+    }
+
+    location = /setup/state {
+        proxy_pass http://127.0.0.1:5000/setup/public-state;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        add_header Cache-Control "no-store";
+    }
+
+    location = /setup/check-prism-status {
+        proxy_pass http://127.0.0.1:5000/setup/check-prism-status;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        add_header Cache-Control "no-store";
+    }
+
+    location = /setup/hardware {
+        return 403;
+    }
+
+    location = /hardware {
+        return 403;
+    }
+
+    location ^~ /setup/ {
+        return 404;
+    }
+}

@@ -1,0 +1,115 @@
+{
+  "backend_job": {
+    "exit_code": 0,
+    "finished_at": "2026-05-15T22:15:05-0700",
+    "job_id": "1778908504-2e9cfdfa3f7d",
+    "started_at": "2026-05-15T22:15:04-0700",
+    "status": "succeeded"
+  },
+  "changed_files": [],
+  "changed_services": [],
+  "checks": {
+    "markers": {
+      "firstboot_done": true,
+      "setup_complete": true,
+      "setup_mode": false
+    },
+    "models": {
+      "count": 1,
+      "models": [
+        "llama3.1:8b"
+      ],
+      "reachable": true
+    },
+    "nginx": {
+      "active": true,
+      "state": "active"
+    },
+    "ollama": {
+      "active": true,
+      "state": "active"
+    },
+    "ports": {
+      "available": true,
+      "listeners": [
+        {
+          "port": 22,
+          "proto": "LISTEN"
+        },
+        {
+          "port": 53,
+          "proto": "LISTEN"
+        },
+        {
+          "port": 80,
+          "proto": "LISTEN"
+        },
+        {
+          "port": 3306,
+          "proto": "LISTEN"
+        },
+        {
+          "port": 5000,
+          "proto": "LISTEN"
+        },
+        {
+          "port": 5355,
+          "proto": "LISTEN"
+        },
+        {
+          "port": 5432,
+          "proto": "LISTEN"
+        },
+        {
+          "port": 6379,
+          "proto": "LISTEN"
+        },
+        {
+          "port": 11434,
+          "proto": "LISTEN"
+        }
+      ]
+    },
+    "prism_setup_backend": {
+      "active": true,
+      "state": "active"
+    },
+    "public_api": {
+      "/setup/jobs": "blocked_by_nginx",
+      "/setup/state": "sanitized"
+    },
+    "setup_state": {
+      "exists": true,
+      "privacy": {
+        "dev_disk_by_id_paths_present": false,
+        "raw_mac_addresses_present": false,
+        "serial_fields_redacted": true,
+        "uuid_like_ids_present": false
+      },
+      "public_state_reachable_locally": true,
+      "public_state_via_nginx_status": 200,
+      "raw_state_reachable_locally": true
+    }
+  },
+  "exit_code": 0,
+  "finished_at": "2026-05-15T22:15:04-0700",
+  "job_name": "check_prism_status",
+  "read_only": true,
+  "redactions": [
+    "mac",
+    "serial",
+    "wwn",
+    "uuid",
+    "token",
+    "password",
+    "cookie",
+    "private_key",
+    "api_key"
+  ],
+  "rollback_hint": "No changes made; read-only job.",
+  "started_at": "2026-05-15T22:15:04-0700",
+  "status": "succeeded",
+  "stderr": "",
+  "stdout": "",
+  "summary": "Read-only PRISM status snapshot collected by approved backend job."
+}

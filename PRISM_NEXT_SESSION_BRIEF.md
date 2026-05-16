@@ -1,76 +1,51 @@
 # PRISM Next Session Brief
 
-Current live PRISM target:
+Current server: `192.168.14.115`
+Mothership: `192.168.14.1`
 
-```text
-192.168.14.115
-```
+Current good tag: `iris-status-loop-v1-20260515`
+Current HEAD: `6b20cc247224944f23fc729ef6715b43e261e246`
 
-Mothership:
-
-```text
-192.168.14.1
-```
-
-Current state:
+What works:
 
 - Iris truth bridge is working.
-- Browser `/setup/state` reaches the backend through nginx and returns JSON.
-- Frontend injects sanitized `PRISM_STATE` into the Ollama messages array.
-- Raw `/setup/state` remains unchanged for backend/internal use.
-- Disk serials, MAC addresses, WWNs, UUID-like IDs, and stable device IDs are redacted before Iris sees state.
-- If PRISM state is unavailable, the frontend injects a strong unavailable-state message so Iris refuses to invent local facts.
+- Public `/setup/state` returns sanitized PRISM state.
+- Frontend injects grounded `PRISM_STATE`.
+- Missing-state fallback tells Iris not to invent local facts.
+- Public `POST /setup/check-prism-status` works as the first public-safe read-only Iris hand.
+- Frontend calls that status endpoint only for clear status/health questions.
+- Iris answers status prompts with: "Here is what the PRISM backend reported:"
+- `/hardware` and `/setup/hardware` are blocked.
+- `/setup/jobs` and `/setup/jobs/...` are blocked publicly.
 
-Latest known-good commit:
+What is blocked for safety:
 
-```text
-25406f3b987848bccd619a1468e190d2331823f1
-```
+- Generic public job runner access.
+- Mutating job URLs such as `install_vaultwarden`.
+- Raw hardware endpoints.
+- Raw MACs, disk serials, WWNs, UUID-like IDs, and stable device IDs in public/Iris state.
 
-Known truth-bridge tags:
+What is not done:
 
-```text
-truth-bridge-working-20260515
-truth-bridge-sanitized-20260515
-truth-bridge-missing-state-20260515
-```
+- MOTD color/banner fix.
+- Verified GPU assignment fields in `PRISM_STATE`.
+- Agent/runner GPU assignment reporting.
+- Next read-only Iris hand.
+- Gated install flow through backend jobs.
+- Public mutating job controls.
 
-Checkpoint directory:
+Architecture boundary:
 
-```text
-/vault/pve-media/projects/prism/checkpoints/20260515-truth-bridge/
-```
+Codex must not install PRISM services directly on `192.168.14.115`. Iris should install/manage services only through verified PRISM backend jobs after proper gates exist.
 
-Documentation:
+Recommended next task:
 
-```text
-/vault/pve-media/projects/prism/docs/PRISM_TRUTH_BRIDGE_20260515.md
-```
+Fix the MOTD color/banner issue, then improve `PRISM_STATE` GPU assignment fields. Do not expose generic `/setup/jobs` publicly.
 
-Important architecture boundary:
+Checkpoint:
 
-Codex must not install PRISM services directly on `192.168.14.115`.
+`/vault/pve-media/projects/prism/checkpoints/20260515-end-of-session/`
 
-Iris is supposed to install and manage services through PRISM's verified backend/job system. Do not bypass Iris by manually installing Vaultwarden, AdGuard, SearXNG, Nextcloud, Paperless, Headscale, Jellyfin, or other PRISM services with Codex.
+Archive:
 
-Still not done:
-
-- real Iris job execution through verified backend workflow
-- `iris-tool`
-- backend job result loop
-- core service installs through Iris/backend jobs
-- service status reporting
-- repo/live backend reconciliation
-
-Recommended next steps:
-
-1. Compare live `/usr/local/bin/prism-setup-backend` behavior to repo `net/ui/prism-setup-backend.py` without exposing secrets.
-2. Reconcile the backend job API into the repo.
-3. Define backend response schema for job start, job progress, job result, and service status.
-4. Add source-labeled job result messages for Iris.
-5. Add read-only service status endpoint.
-6. Test Iris starting a harmless read-only job first.
-7. Only after the job result loop is verified, test service installs through Iris/backend jobs.
-
-Do not change nginx, backend, Ollama, models, passwords, systemd units, or services unless the next task explicitly requests it.
-
+`/vault/pve-media/projects/prism/checkpoints/prism-end-of-session-20260515.tar.gz`
