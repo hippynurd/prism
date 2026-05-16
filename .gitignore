@@ -11,3 +11,4 @@ __pycache__/
 *.pyo
 .Python
 net/ollama/lib/
+checkpoints/*.tar.gz
