@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -35,6 +36,13 @@ SCRIPT_DIR = Path(os.environ.get("PRISM_SETUP_JOB_SCRIPT_DIR", "/usr/local/lib/p
 
 DEFAULT_MODEL = "llama3.2:1b"
 MODEL_ALLOWLIST = {"llama3.2:1b", "llama3.2:3b", "llama3.1:8b"}
+REDACTED = "[REDACTED]"
+MAC_RE = re.compile(r"(?i)^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$")
+UUID_RE = re.compile(r"(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+API_KEY_RE = re.compile(r"(?i)^(?:sk|pk|ghp|github_pat|xox[baprs])-?[a-z0-9_\\-]{16,}$")
+SENSITIVE_KEY_RE = re.compile(
+    r"(?i)(serial|mac|mac_address|wwn|uuid|by_id|password|passwd|token|cookie|private_key|api[_-]?key)"
+)
 
 
 ALLOWED_JOBS: dict[str, dict[str, str]] = {
@@ -239,6 +247,43 @@ def collect_state() -> dict[str, Any]:
     return state
 
 
+def should_redact_value(key: str, value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    lower_key = key.lower()
+    if lower_key == "address" and MAC_RE.match(value):
+        return True
+    if lower_key == "id" and (UUID_RE.match(value) or value.startswith("0x") or len(value) >= 16):
+        return True
+    return (
+        MAC_RE.match(value) is not None
+        or UUID_RE.match(value) is not None
+        or "/dev/disk/by-id" in value
+        or API_KEY_RE.match(value) is not None
+        or "-----BEGIN " in value
+    )
+
+
+def sanitize_public_state(value: Any, key: str = "") -> Any:
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for item_key, item_value in value.items():
+            if SENSITIVE_KEY_RE.search(item_key) or should_redact_value(item_key, item_value):
+                sanitized[item_key] = REDACTED
+            else:
+                sanitized[item_key] = sanitize_public_state(item_value, item_key)
+        return sanitized
+    if isinstance(value, list):
+        return [sanitize_public_state(item, key) for item in value]
+    if should_redact_value(key, value):
+        return REDACTED
+    return value
+
+
+def collect_public_state() -> dict[str, Any]:
+    return sanitize_public_state(collect_state())
+
+
 def choose_recommended_model(ram_mb: int) -> str:
     if ram_mb >= 28000:
         return "llama3.1:8b"
@@ -387,6 +432,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         path = urlparse(self.path).path.rstrip("/") or "/"
+
+        if path in {"/setup/public-state", "/public-state"}:
+            self._json(collect_public_state())
+            return
 
         if path in {"/state", "/setup/state", "/hardware", "/setup/hardware"}:
             self._json(collect_state())
