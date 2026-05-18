@@ -929,6 +929,49 @@ Behavior:
       ].some((phrase) => normalized.includes(phrase));
     }
 
+    function isCapabilityPlannerQuestion(text) {
+      const normalized = String(text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      return [
+        "what can this prism box do",
+        "what can this machine do",
+        "what should i install",
+        "what is this hardware good for",
+        "help me choose what to set up",
+        "what can prism do with this computer",
+        "i m not sure what i want",
+        "im not sure what i want",
+        "not sure what i want",
+        "what should prism do",
+        "what should this server do",
+        "what can this computer do"
+      ].some((phrase) => normalized.includes(phrase));
+    }
+
+    function inferCapabilityGoals(text) {
+      const normalized = String(text || "").toLowerCase();
+      const goals = [];
+      const addGoal = (goal) => {
+        if (!goals.includes(goal)) {
+          goals.push(goal);
+        }
+      };
+
+      if (normalized.includes("privacy")) addGoal("privacy");
+      if (normalized.includes("password")) addGoal("passwords");
+      if (normalized.includes("adguard") || normalized.includes("ad block") || normalized.includes("dns")) addGoal("ad_blocking");
+      if (normalized.includes("search")) addGoal("private_search");
+      if (normalized.includes("file") || normalized.includes("backup") || normalized.includes("storage")) addGoal("files_backups");
+      if (normalized.includes("local ai") || normalized.includes("llm") || normalized.includes("model")) addGoal("local_ai");
+      if (normalized.includes("coding") || normalized.includes("agent") || normalized.includes("helper")) addGoal("coding_helpers");
+      if (normalized.includes("image generation") || normalized.includes("stable diffusion")) addGoal("image_generation");
+      if (normalized.includes("media") || normalized.includes("music") || normalized.includes("jellyfin")) addGoal("media_music");
+      if (normalized.includes("home automation")) addGoal("home_automation");
+      if (normalized.includes("router") || normalized.includes("firewall") || normalized.includes("lab")) addGoal("router_firewall_lab");
+      if (normalized.includes("kiosk") || normalized.includes("factory") || normalized.includes("pxe")) addGoal("kiosk_factory");
+      if (normalized.includes("not sure") || normalized.includes("what i want")) addGoal("not_sure");
+      return goals;
+    }
+
     function inferBlockerDiagnosisService(text) {
       const normalized = String(text || "").toLowerCase();
       if (normalized.includes("adguard") || normalized.includes("port 53") || normalized.includes("dns")) {
@@ -1087,6 +1130,36 @@ Behavior:
       ].join("\n");
     }
 
+    function prismCapabilityPlannerMessage(result) {
+      const sanitizedResult = sanitizeBackendResultForIris(result || {}, "");
+      return [
+        "PRISM_BACKEND_RESULT below is the only source of truth for this capability analysis.",
+        "Report only what the backend returned.",
+        "Do not claim you installed anything.",
+        "Do not claim you changed services.",
+        "Do not claim you ran commands personally.",
+        "Do not invent hardware, services, files, logs, ports, job results, or command output.",
+        "Say: \"Here is what the PRISM backend reported:\"",
+        "Explain what the hardware is good for using only the backend result.",
+        "Ask the user what goals matter most before recommending system-changing actions.",
+        "Mention image generation only as an optional possible GPU use, not as an assumed goal.",
+        "Distinguish Iris as the operator assistant from helper or runner models.",
+        "If asked where this came from, say: \"From the PRISM backend analyze-capabilities endpoint.\"",
+        "Summarize the result in concise human-readable bullets. Do not paste raw JSON unless the user asks for raw JSON.",
+        "Here is what the PRISM backend reported:",
+        JSON.stringify(sanitizedResult)
+      ].join("\n");
+    }
+
+    function prismCapabilityPlannerUnavailableMessage(message) {
+      return [
+        "The PRISM backend capability analysis failed or was unavailable.",
+        "Do not guess capability planning details.",
+        "Tell the user the capability analysis failed or was unavailable and provide the HTTP/status error if available.",
+        "Capability analysis error: " + (message || "unknown error")
+      ].join("\n");
+    }
+
     async function buildPrismStatusContext() {
       try {
         const response = await fetch("/setup/check-prism-status", { method: "POST" });
@@ -1144,6 +1217,27 @@ Behavior:
         return prismAIRunnerReadinessMessage(result);
       } catch (error) {
         return prismAIRunnerReadinessUnavailableMessage(error.message);
+      }
+    }
+
+    async function buildCapabilityPlannerContext(text) {
+      try {
+        const goals = inferCapabilityGoals(text);
+        const options = {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        };
+        if (goals.length) {
+          options.body = JSON.stringify({ goals });
+        }
+        const response = await fetch("/setup/analyze-capabilities", options);
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+        const result = await response.json();
+        return prismCapabilityPlannerMessage(result);
+      } catch (error) {
+        return prismCapabilityPlannerUnavailableMessage(error.message);
       }
     }
 
@@ -1316,7 +1410,9 @@ Behavior:
       chatInput.value = "";
       sendButton.disabled = true;
       addMessage("user", "You", text);
-      if (isAIRunnerReadinessQuestion(text)) {
+      if (isCapabilityPlannerQuestion(text)) {
+        messages.push({ role: "system", content: await buildCapabilityPlannerContext(text) });
+      } else if (isAIRunnerReadinessQuestion(text)) {
         messages.push({ role: "system", content: await buildAIRunnerReadinessContext() });
       } else if (isBlockerDiagnosisQuestion(text)) {
         messages.push({ role: "system", content: await buildBlockerDiagnosisContext(text) });

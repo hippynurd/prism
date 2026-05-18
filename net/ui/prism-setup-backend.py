@@ -37,6 +37,7 @@ SCRIPT_DIR = Path(os.environ.get("PRISM_SETUP_JOB_SCRIPT_DIR", "/usr/local/lib/p
 CHECK_INSTALL_READINESS_SCRIPT = SCRIPT_DIR / "check_install_readiness.sh"
 DIAGNOSE_INSTALL_BLOCKERS_SCRIPT = SCRIPT_DIR / "diagnose_install_blockers.sh"
 CHECK_AI_RUNNER_READINESS_SCRIPT = SCRIPT_DIR / "check_ai_runner_readiness.sh"
+ANALYZE_CAPABILITIES_SCRIPT = SCRIPT_DIR / "analyze_capabilities.sh"
 
 DEFAULT_MODEL = "llama3.2:1b"
 MODEL_ALLOWLIST = {"llama3.2:1b", "llama3.2:3b", "llama3.1:8b"}
@@ -85,6 +86,41 @@ ALLOWED_JOBS: dict[str, dict[str, str]] = {
 }
 
 JOB_LOCK = threading.Lock()
+ALLOWED_CAPABILITY_GOALS = {
+    "privacy",
+    "passwords",
+    "ad_blocking",
+    "private_search",
+    "files_backups",
+    "local_ai",
+    "coding_helpers",
+    "image_generation",
+    "media_music",
+    "home_automation",
+    "router_firewall_lab",
+    "kiosk_factory",
+    "not_sure",
+}
+CAPABILITY_GOAL_ALIASES = {
+    "ad blocking": "ad_blocking",
+    "private search": "private_search",
+    "files": "files_backups",
+    "backups": "files_backups",
+    "files/backups": "files_backups",
+    "local ai": "local_ai",
+    "coding_helper_agents": "coding_helpers",
+    "coding helpers": "coding_helpers",
+    "helper_agents": "coding_helpers",
+    "image generation": "image_generation",
+    "media/music": "media_music",
+    "home automation": "home_automation",
+    "router/firewall/lab": "router_firewall_lab",
+    "kiosk/factory": "kiosk_factory",
+    "kiosk_factory_workflows": "kiosk_factory",
+    "i'm not sure": "not_sure",
+    "im not sure": "not_sure",
+    "not sure": "not_sure",
+}
 
 
 def now_iso() -> str:
@@ -670,6 +706,321 @@ def run_public_check_ai_runner_readiness(timeout_seconds: int = 30) -> dict[str,
         )
 
 
+def normalize_capability_goals(payload: dict[str, Any] | None) -> list[str]:
+    raw_goals = (payload or {}).get("goals", [])
+    if isinstance(raw_goals, str):
+        raw_goals = [raw_goals]
+    if not isinstance(raw_goals, list):
+        raw_goals = []
+
+    goals: list[str] = []
+    for item in raw_goals:
+        key = str(item or "").strip().lower().replace("-", "_")
+        key = CAPABILITY_GOAL_ALIASES.get(key, key)
+        key = key.replace(" ", "_")
+        if key in ALLOWED_CAPABILITY_GOALS and key not in goals:
+            goals.append(key)
+    return goals
+
+
+def parse_size_to_gb(value: Any) -> float:
+    if isinstance(value, (int, float)):
+        return round(float(value) / (1024**3), 2) if float(value) > 1000000 else float(value)
+    text = str(value or "").strip().upper().replace(" ", "")
+    if not text:
+        return 0.0
+    match = re.match(r"^([0-9]+(?:\.[0-9]+)?)([KMGTPE]?)(?:I?B)?$", text)
+    if not match:
+        return 0.0
+    amount = float(match.group(1))
+    unit = match.group(2)
+    multipliers = {"": 1 / (1024**3), "K": 1 / (1024**2), "M": 1 / 1024, "G": 1, "T": 1024, "P": 1024 * 1024, "E": 1024 * 1024 * 1024}
+    return round(amount * multipliers.get(unit, 0), 2)
+
+
+def tier_value(recommended: bool = False, possible: bool = False, not_recommended: bool = False) -> str:
+    if recommended:
+        return "recommended"
+    if possible:
+        return "possible"
+    if not_recommended:
+        return "not_recommended"
+    return "unknown"
+
+
+def append_unique(items: list[Any], item: Any) -> None:
+    if item not in items:
+        items.append(item)
+
+
+def service_recommendation(
+    service_id: str,
+    label: str,
+    fit: str,
+    why: str,
+    requires: list[str] | None = None,
+    blocked_by: list[str] | None = None,
+    risk: str = "low",
+) -> dict[str, Any]:
+    return {
+        "id": service_id,
+        "label": label,
+        "fit": fit,
+        "why": why,
+        "requires": requires or [],
+        "blocked_by": blocked_by or [],
+        "risk": risk,
+        "installable_now": False,
+        "read_only_recommendation": True,
+    }
+
+
+def extract_blocker_summaries(blocker_result: dict[str, Any]) -> list[str]:
+    blockers: list[str] = []
+    for item in blocker_result.get("blockers", []) if isinstance(blocker_result.get("blockers"), list) else []:
+        if isinstance(item, dict):
+            summary = str(item.get("summary") or item.get("message") or item.get("type") or "").strip()
+            service = str(item.get("service") or "").strip()
+            if summary and service:
+                append_unique(blockers, f"{service}: {summary}")
+            elif summary:
+                append_unique(blockers, summary)
+        elif item:
+            append_unique(blockers, str(item))
+
+    service_readiness = blocker_result.get("service_readiness")
+    if isinstance(service_readiness, dict):
+        for service, details in service_readiness.items():
+            if not isinstance(details, dict):
+                continue
+            status = str(details.get("status") or "").lower()
+            reasons = details.get("reasons") if isinstance(details.get("reasons"), list) else []
+            if status in {"blocked", "warning"}:
+                reason_text = "; ".join(str(reason) for reason in reasons if reason)
+                append_unique(blockers, f"{service}: {reason_text or status}")
+    return blockers
+
+
+def analyze_capabilities(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    goals = normalize_capability_goals(payload)
+    state = collect_public_state()
+    status_result = run_public_check_prism_status()
+    readiness = run_public_check_install_readiness()
+    ai_readiness = run_public_check_ai_runner_readiness()
+
+    readiness_overall = str(readiness.get("overall") or readiness.get("status") or "unknown").lower()
+    blocker_result: dict[str, Any] = {}
+    if readiness_overall in {"warning", "blocked", "limited", "failed", "unknown"}:
+        blocker_result = run_public_diagnose_install_blockers({})
+
+    ram_mb = int(state.get("total_ram_mb") or 0)
+    ram_gb = round(ram_mb / 1024, 1) if ram_mb else 0
+    extra_disks = state.get("extra_disks") if isinstance(state.get("extra_disks"), list) else []
+    extra_storage_gb = sum(parse_size_to_gb(disk.get("size")) for disk in extra_disks if isinstance(disk, dict))
+    nics = state.get("nics") if isinstance(state.get("nics"), list) else []
+    nic_count = int(state.get("nic_count") or len(nics))
+    gpu_devices = state.get("gpu_devices") if isinstance(state.get("gpu_devices"), list) else []
+    ai_gpu_devices = ai_readiness.get("gpu_devices") if isinstance(ai_readiness.get("gpu_devices"), list) else []
+    gpu_count = max(len(gpu_devices), len(ai_gpu_devices))
+    gpu_present = bool(state.get("gpu_present") or gpu_count)
+    gpu_usable = bool(state.get("gpu_usable") or state.get("ollama_gpu_ready") or ai_readiness.get("overall") in {"ready", "warning"})
+    gpu_driver = str(state.get("gpu_driver") or "").lower()
+    ollama_gpu_ready = bool(state.get("ollama_gpu_ready"))
+
+    ram_tier = "unknown"
+    if ram_mb:
+        if ram_mb >= 64000:
+            ram_tier = "very_high"
+        elif ram_mb >= 28000:
+            ram_tier = "high"
+        elif ram_mb >= 12000:
+            ram_tier = "medium"
+        else:
+            ram_tier = "low"
+
+    storage_tier = "unknown"
+    if extra_storage_gb >= 2000:
+        storage_tier = "storage_heavy"
+    elif extra_storage_gb >= 500:
+        storage_tier = "good_extra_storage"
+    elif extra_disks:
+        storage_tier = "some_extra_storage"
+    else:
+        storage_tier = "boot_disk_only_or_unknown"
+
+    gpu_tier = "none_verified"
+    if gpu_count >= 2 and gpu_usable:
+        gpu_tier = "multi_gpu_ready"
+    elif gpu_count >= 2:
+        gpu_tier = "multi_gpu_present"
+    elif gpu_count == 1 and gpu_usable:
+        gpu_tier = "single_gpu_ready"
+    elif gpu_count == 1 or gpu_present:
+        gpu_tier = "gpu_present_unverified"
+
+    network_tier = "unknown"
+    if nic_count >= 2:
+        network_tier = "multi_nic"
+    elif nic_count == 1:
+        network_tier = "single_nic"
+
+    hardware_unknowns: list[str] = []
+    if not ram_mb:
+        hardware_unknowns.append("RAM amount was not reported.")
+    if storage_tier == "boot_disk_only_or_unknown":
+        hardware_unknowns.append("Only extra disk inventory is available; total disk layout is not fully described.")
+    if gpu_tier in {"none_verified", "gpu_present_unverified", "multi_gpu_present"}:
+        hardware_unknowns.append("GPU assignment or usability is not fully verified.")
+    if network_tier == "unknown":
+        hardware_unknowns.append("Network interface count is unknown.")
+    hardware_unknowns.append("Wi-Fi and Bluetooth capability are not verified by this planner.")
+
+    blockers = extract_blocker_summaries(readiness) + extract_blocker_summaries(blocker_result)
+    if "adguard" in json.dumps(readiness).lower() and "port 53" in json.dumps(readiness).lower():
+        append_unique(blockers, "AdGuard may be blocked because port 53 is in use.")
+    if "port 53" in json.dumps(blocker_result).lower():
+        append_unique(blockers, "AdGuard may be blocked because port 53 is in use.")
+
+    recommended_roles: list[str] = []
+    if ram_mb >= 28000 and gpu_count >= 2:
+        recommended_roles.extend(["PRISM dev server", "local AI/helper runner", "coding/helper agent host", "factory/control-plane candidate"])
+    elif ram_mb >= 12000 and gpu_present:
+        recommended_roles.extend(["local AI/helper runner", "privacy services host"])
+    elif extra_storage_gb >= 500:
+        recommended_roles.extend(["files/backups host", "privacy services host"])
+    else:
+        recommended_roles.extend(["privacy basics host", "lightweight PRISM services host"])
+    if nic_count >= 2:
+        append_unique(recommended_roles, "router/firewall lab candidate")
+    append_unique(recommended_roles, "Iris operator assistant host")
+
+    capability_tiers = {
+        "privacy_basics": tier_value(recommended=True),
+        "local_ai": tier_value(recommended=(gpu_usable and ram_mb >= 28000), possible=(gpu_present or ram_mb >= 12000), not_recommended=(ram_mb and ram_mb < 12000 and not gpu_present)),
+        "files_backups": tier_value(recommended=extra_storage_gb >= 500, possible=bool(extra_disks) or ram_mb >= 12000),
+        "kiosk_factory": tier_value(recommended=(ram_mb >= 12000 and nic_count >= 1), possible=ram_mb > 0),
+    }
+
+    recommended_services = [
+        service_recommendation("private_search", "Private search", "recommended", "Good privacy-first service once basic networking is ready."),
+        service_recommendation("vaultwarden", "Password manager", "recommended", "Useful early PRISM service for user-controlled passwords and secrets."),
+    ]
+    possible_services = [
+        service_recommendation("adguard_home", "Ad blocking DNS", "possible", "Useful privacy basic, but DNS port ownership must be confirmed.", ["available port 53 or a planned DNS handoff"], ["port 53 in use"] if any("port 53" in item.lower() for item in blockers) else []),
+        service_recommendation("home_automation", "Home automation", "possible", "A good fit when the user wants local device coordination."),
+    ]
+    not_recommended_services: list[dict[str, Any]] = []
+
+    if capability_tiers["files_backups"] == "recommended":
+        recommended_services.append(service_recommendation("files_backups", "Files and backups", "recommended", "Extra storage makes this machine a good candidate for files, backups, media, or archives."))
+    else:
+        possible_services.append(service_recommendation("files_backups", "Files and backups", "possible", "May be useful, but extra storage is limited or not verified."))
+
+    if capability_tiers["local_ai"] == "recommended":
+        recommended_services.append(service_recommendation("local_ai_runner", "Local AI/helper runner", "recommended", "RAM and GPU signals make this a strong candidate for helper models and coding agents."))
+        possible_services.append(service_recommendation("image_generation", "Image generation", "possible", "One possible GPU workload if the user wants it; GPU assignment still needs explicit planning.", ["verified GPU readiness"], []))
+    elif capability_tiers["local_ai"] == "possible":
+        possible_services.append(service_recommendation("local_ai_runner", "Local AI/helper runner", "possible", "Some AI signals are present, but GPU assignment or capacity is not fully verified."))
+        possible_services.append(service_recommendation("image_generation", "Image generation", "possible", "Only consider this after GPU readiness and VRAM are verified."))
+    else:
+        not_recommended_services.append(service_recommendation("image_generation", "Image generation", "not_recommended", "No usable GPU was verified for image generation.", ["verified GPU"], []))
+
+    if nic_count < 2:
+        not_recommended_services.append(service_recommendation("router_firewall_lab", "Router/firewall lab", "not_recommended", "A router/firewall role usually needs verified network interface planning.", ["verified network interfaces"], []))
+    else:
+        possible_services.append(service_recommendation("router_firewall_lab", "Router/firewall lab", "possible", "Multiple NICs make lab routing possible, but this needs explicit network planning."))
+
+    if "not_sure" in goals or not goals:
+        questions = [
+            "What matters most first: privacy basics, files/backups, local AI, coding helpers, media/music, home automation, router/lab work, or kiosk/factory workflows?",
+        ]
+    else:
+        questions = ["Should Iris prioritize these goals first: " + ", ".join(goals) + "?"]
+    if gpu_present and not ollama_gpu_ready:
+        questions.append("Should GPU setup remain advisory until you explicitly choose a local AI goal?")
+
+    hardware_upgrade_suggestions: list[str] = []
+    if ram_mb and ram_mb < 12000:
+        hardware_upgrade_suggestions.append("More RAM would improve local AI and multi-service use.")
+    if not gpu_present and any(goal in goals for goal in ("local_ai", "coding_helpers", "image_generation")):
+        hardware_upgrade_suggestions.append("A supported GPU would help local AI, coding helper models, and optional image generation.")
+    if not extra_disks and any(goal in goals for goal in ("files_backups", "media_music")):
+        hardware_upgrade_suggestions.append("Additional storage would make files, backups, and media workflows safer.")
+    if nic_count < 2 and "router_firewall_lab" in goals:
+        hardware_upgrade_suggestions.append("A second verified network interface would make router/firewall lab work more realistic.")
+
+    overall = "unknown"
+    if readiness_overall in {"blocked", "failed"} or blockers:
+        overall = "warning"
+    elif ram_mb or gpu_present or extra_disks:
+        overall = "ready"
+    elif ram_mb and ram_mb < 12000:
+        overall = "limited"
+
+    summary_parts = []
+    if ram_mb:
+        summary_parts.append(f"{ram_gb}GB RAM")
+    if extra_storage_gb:
+        summary_parts.append(f"about {round(extra_storage_gb / 1024, 1)}TB extra storage")
+    if gpu_count >= 2:
+        summary_parts.append(f"{gpu_count} GPU devices reported")
+    elif gpu_present:
+        summary_parts.append("GPU present")
+    if not summary_parts:
+        summary_parts.append("limited verified hardware detail")
+    summary = "This machine reports " + ", ".join(summary_parts) + ". "
+    if gpu_count >= 2 and ram_mb >= 28000:
+        summary += "It is a good candidate for PRISM dev/local AI/helper runner work, with image generation only as an optional GPU use."
+    elif extra_storage_gb >= 500:
+        summary += "It is a good candidate for privacy basics plus files/backups."
+    else:
+        summary += "It is best treated as a privacy-basics or lightweight PRISM host until more capability is verified."
+    if blockers:
+        summary += " Some readiness blockers or warnings need attention before install planning."
+
+    confidence = "high" if ram_mb and (gpu_present or extra_disks) else "medium" if ram_mb else "low"
+    if hardware_unknowns:
+        confidence = "medium" if confidence == "high" else confidence
+
+    next_safe_action = "Ask the user which goals matter most, then explain a read-only recommended plan. Do not start installs."
+    if blockers:
+        next_safe_action = "Explain the blockers and ask which goal to plan around first. Do not start installs."
+
+    response = {
+        "endpoint": "analyze-capabilities",
+        "read_only": True,
+        "changed_files": [],
+        "changed_services": [],
+        "overall": overall,
+        "summary": summary,
+        "hardware_summary": {
+            "ram_tier": ram_tier,
+            "storage_tier": storage_tier,
+            "gpu_tier": gpu_tier,
+            "network_tier": network_tier,
+            "unknowns": hardware_unknowns,
+        },
+        "capability_tiers": capability_tiers,
+        "recommended_roles": recommended_roles,
+        "recommended_services": recommended_services,
+        "possible_services": possible_services,
+        "not_recommended_services": not_recommended_services,
+        "blockers": blockers,
+        "questions_for_user": questions,
+        "hardware_upgrade_suggestions": hardware_upgrade_suggestions,
+        "next_safe_action": next_safe_action,
+        "confidence": confidence,
+        "inputs": {
+            "goals": goals,
+            "status_overall": status_result.get("status") or status_result.get("overall") or "unknown",
+            "readiness_overall": readiness.get("overall") or "unknown",
+            "ai_runner_overall": ai_readiness.get("overall") or "unknown",
+            "blocker_diagnosis_included": bool(blocker_result),
+        },
+    }
+    return sanitize_public_state(response)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "PrismSetupBackend/0.2"
 
@@ -734,6 +1085,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/setup/check-ai-runner-readiness":
             self._json(run_public_check_ai_runner_readiness())
+            return
+
+        if path == "/setup/analyze-capabilities":
+            self._json(analyze_capabilities(payload))
             return
 
         for prefix in ("/jobs/", "/setup/jobs/"):
