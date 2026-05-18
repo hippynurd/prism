@@ -78,24 +78,21 @@ ssh -o BatchMode=yes prism-115 true
 
 The MotherShip key was created locally.
 
-The public key was not installed on 115 from this session because
-`ssh-copy-id` required an interactive password prompt and the password must not
-be captured through chat or tooling logs.
+The public key has been installed manually on 115.
 
 Current direct key test result:
 
 ```text
-key login works: no
+key login works: yes
 ```
 
 Current alias test result:
 
 ```text
-alias works: no
+alias works: yes
 ```
 
-The `prism-115` alias should be added only after the public key is installed and
-the direct key test succeeds.
+The `prism-115` alias is configured in `/root/.ssh/config` on MotherShip.
 
 ## Bootstrap Install Procedure
 
@@ -131,4 +128,3 @@ Before image-clean/finalization:
 4. Remove the `Host prism-115` stanza from `/root/.ssh/config` if desired.
 
 Do not ship this key in production images.
-
