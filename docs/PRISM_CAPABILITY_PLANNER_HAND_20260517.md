@@ -196,40 +196,115 @@ secret value.
 
 ## Live Deployment Status
 
-Live deployment to `192.168.14.115` was not completed from this session because
-SSH authentication failed:
+Live deployment to `192.168.14.115` completed from MotherShip after dev SSH
+access was restored.
+
+Deployed files:
 
 ```text
-root@192.168.14.115: Permission denied (publickey,password).
+/usr/local/bin/prism-setup-backend
+/usr/local/lib/prism/setup-jobs/analyze_capabilities.sh
+/var/www/prism-chat/index.html
+/etc/nginx/sites-available/prism-iris
 ```
 
-Because SSH was unavailable, these live actions were not performed:
-
-- backup `/usr/local/bin/prism-setup-backend`
-- backup `/var/www/prism-chat/index.html`
-- backup `/etc/nginx/sites-available/prism-iris`
-- copy updated backend/UI/nginx/script files
-- restart `prism-setup-backend`
-- run `nginx -t`
-- reload nginx
-- complete live Iris UI test
-
-Read-only public checks against the current live 115 state showed:
+Live backup paths:
 
 ```text
-POST /setup/analyze-capabilities: 404 Not Found
+/usr/local/bin/prism-setup-backend.backup-20260517-capability-planner
+/var/www/prism-chat/index.html.backup-20260517-capability-planner
+/etc/nginx/sites-available/prism-iris.backup-20260517-capability-planner
+```
+
+Live validation passed:
+
+```text
+python3 -m py_compile /usr/local/bin/prism-setup-backend
+bash -n /usr/local/lib/prism/setup-jobs/analyze_capabilities.sh
+nginx -t
+systemctl is-active prism-setup-backend: active
+```
+
+Services restarted/reloaded:
+
+```text
+systemctl restart prism-setup-backend
+systemctl reload nginx
+```
+
+No services were installed. No packages were installed. No models were changed.
+No GPU settings were changed. No mutating jobs were triggered.
+
+Public checks from MotherShip:
+
+```text
+POST /setup/analyze-capabilities: 200 OK
+POST /setup/analyze-capabilities {"goals":["privacy","local_ai"]}: 200 OK
 GET /setup/jobs: 403 Forbidden
-GET /hardware: 403 Forbidden
+POST /setup/jobs/install_vaultwarden: 403 Forbidden
 GET /setup/state: 200 OK, sanitized JSON
+GET /hardware: 403 Forbidden
+GET /setup/hardware: 403 Forbidden
 ```
 
-The 404 is expected until the updated backend and nginx config are deployed.
+Capability planner response summary:
+
+```text
+read_only: true
+changed_files: []
+changed_services: []
+overall: warning
+hardware_summary.ram_tier: very_high
+hardware_summary.storage_tier: storage_heavy
+hardware_summary.gpu_tier: multi_gpu_ready
+hardware_summary.network_tier: multi_nic
+next_safe_action: Explain the blockers and ask which goal to plan around first. Do not start installs.
+```
+
+Live privacy check on planner output:
+
+```text
+raw MAC addresses present: false
+disk serial values present: false
+WWN values present: false
+UUID-like hardware ID values present: false
+/dev/disk/by-id paths present: false
+password/token/cookie/private key values present: false
+useful capability planning info present: true
+```
+
+Iris behavior test with:
+
+```text
+What can this PRISM box do?
+```
+
+Result:
+
+```text
+Iris began with "Here is what the PRISM backend reported:"
+Iris described RAM, extra storage, GPUs, and good-fit roles from backend data.
+Iris asked the user to choose goals before install planning.
+Iris did not claim anything was installed.
+Iris did not claim services were changed.
+Iris mentioned image generation only as an optional GPU use.
+```
+
+Representative Iris response excerpt:
+
+```text
+Here is what the PRISM backend reported:
+
+This machine reports 62.6GB RAM, about 2.7TB extra storage, 2 GPU devices reported.
+It is a good candidate for PRISM dev/local AI/helper runner work, with image
+generation only as an optional GPU use.
+```
 
 ## Required Live Deployment Steps
 
-When SSH access to 115 is available:
+Completed on 115:
 
-1. Back up live files:
+1. Backed up live files:
 
    ```text
    /usr/local/bin/prism-setup-backend.backup-20260517-capability-planner
@@ -237,7 +312,7 @@ When SSH access to 115 is available:
    /etc/nginx/sites-available/prism-iris.backup-20260517-capability-planner
    ```
 
-2. Copy updated files:
+2. Copied updated files:
 
    ```text
    net/ui/prism-setup-backend.py -> /usr/local/bin/prism-setup-backend
@@ -246,7 +321,7 @@ When SSH access to 115 is available:
    net/setup-jobs/analyze_capabilities.sh -> /usr/local/lib/prism/setup-jobs/analyze_capabilities.sh
    ```
 
-3. Verify syntax on 115:
+3. Verified syntax on 115:
 
    ```text
    python3 -m py_compile /usr/local/bin/prism-setup-backend
@@ -254,14 +329,14 @@ When SSH access to 115 is available:
    nginx -t
    ```
 
-4. Restart/reload only what changed and passed syntax:
+4. Restarted/reloaded only changed services:
 
    ```text
    systemctl restart prism-setup-backend
    systemctl reload nginx
    ```
 
-5. Verify public behavior:
+5. Verified public behavior:
 
    ```text
    POST /setup/analyze-capabilities: 200 OK
@@ -273,13 +348,13 @@ When SSH access to 115 is available:
    GET /setup/hardware: 403 Forbidden
    ```
 
-6. Test Iris with:
+6. Tested Iris with:
 
    ```text
    What can this PRISM box do?
    ```
 
-   Expected response begins with:
+   Response began with:
 
    ```text
    Here is what the PRISM backend reported:
@@ -287,4 +362,3 @@ When SSH access to 115 is available:
 
    Iris should explain hardware fit, ask about goals, and not claim any install
    or service change.
-
